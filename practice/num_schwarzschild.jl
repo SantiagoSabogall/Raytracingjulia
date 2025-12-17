@@ -1,6 +1,6 @@
 using Dierckx, DelimitedFiles
 
-mutable struct BlackHole
+mutable struct BlackHole #commit
     data_N::DataFrame
     N::Spline1D
     data_dNdr::DataFrame
