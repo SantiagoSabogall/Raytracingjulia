@@ -1,4 +1,6 @@
 using DifferentialEquations
+using Base.Threads
+using Plots
 
 struct Photon
     alpha::Float64
@@ -181,11 +183,136 @@ end
 
 
 
-mutable struct image
+mutable struct Image
 
-    blackhole::
-    acc_structure::
-    detector::
+    blackhole::BlackHole
+    acc_structure::Structure
+    detector::detector
+
+end
+
+function create_photons(img::Image)
+    println("Creating photons...")
+
+    img.photon_list = Photon[]
+
+    for (i, a) in enumerate(img.detector.alphaRange)
+        for (j, b) in enumerate(img.detector.betaRange)
+            p = Photon(alpha = a, beta = b)
+            p.iC = img.detector.photon_coords(img.blackhole, a, b)
+            p.i = i
+            p.j = j
+            push!(img.photon_list, p)
+        end
+    end
+end
 
 
+
+
+function create_image(img::Image)
+
+    img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
+
+    println("Integrating trajectories with ", nthreads(), " threads")
+    start_time = time()
+
+    @threads for idx in eachindex(img.photon_list)
+        p = img.photon_list[idx]
+
+        img.image_data[p.i, p.j] =
+            geodesics_integrate(p, img.blackhole, img.acc_structure, img.detector)
+    end
+
+    total_time = time() - start_time
+
+    println("\n--- Total time of integration : ", total_time, " seconds ---")
+    println("--- Time per photon : ",
+        total_time / length(img.photon_list),
+        " seconds/photon ---")
+
+end
+
+
+function create_image_no_Doppler(img::Image)
+
+    img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
+
+    println("Integrating trajectories with ", nthreads(), " threads")
+    start_time = time()
+
+    @threads for idx in eachindex(img.photon_list)
+        p = img.photon_list[idx]
+
+        img.image_data[p.i, p.j] =
+            geo_inte_no_Doppler(p, img.blackhole, img.acc_structure, img.detector)
+    end
+
+    total_time = time() - start_time
+
+    println("\n--- Total time of integration : ", total_time, " seconds ---")
+    println("--- Time per photon : ",
+        total_time / length(img.photon_list),
+        " seconds/photon ---")
+
+end
+
+
+function create_shadow(img::Image)
+
+    img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
+
+    println("Integrating trajectories with ", nthreads(), " threads")
+    start_time = time()
+
+    @threads for idx in eachindex(img.photon_list)
+        p = img.photon_list[idx]
+
+        img.image_data[p.i, p.j] =
+            shadow_integ(p, img.blackhole, img.acc_structure, img.detector)
+    end
+
+    total_time = time() - start_time
+
+    println("\n--- Total time of integration : ", total_time, " seconds ---")
+    println("\n EH radius" img.blackhole.EH)
+    println("--- Time per photon : ",
+        total_time / length(img.photon_list),
+        " seconds/photon ---")
+
+end
+
+
+
+function save_data(img::Image, filename::)
+
+end
+
+
+function plot(img::Image)
+
+
+end
+
+
+function plot_shadow(img::Image)
+
+end
+
+
+function plot_contours(img::Image)
+
+
+end
+
+
+function verify_Hamiltonian(img::Image, n::Inf32=10)
+
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    println()
+    println("THIS IS A MODULE DEFINING ONLY A PART OF THE COMPLETE CODE.")
+    println("YOU NEED TO RUN THE main.jl FILE TO GENERATE THE IMAGE")
+    println()
 end

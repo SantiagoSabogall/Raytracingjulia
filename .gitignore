@@ -2,7 +2,9 @@
 # Julia
 ############################
 
-# Archivos compilados
+# Julia
+.julia/
+artifacts/
 *.ji
 
 # Historial REPL
