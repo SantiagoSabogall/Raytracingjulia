@@ -1,3 +1,17 @@
+module Common
+
+export Photon, Image,
+       create_photons!,
+       create_image!,
+       create_image_no_Doppler!,
+       create_shadow!,
+       save_data,
+       plot,
+       plot_shadow,
+       plot_contours,
+       verify_Hamiltonian
+
+
 using DifferentialEquations
 using Base.Threads
 using Plots
@@ -361,6 +375,8 @@ function verify_Hamiltonian(img::Image, n::Int=10)
 
     display(plt)
     println()
+end
+
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
