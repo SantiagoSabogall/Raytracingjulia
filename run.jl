@@ -1,6 +1,6 @@
 using Pkg
 Pkg.activate(@__DIR__)
-Pkg.instantiate()
+# Pkg.instantiate() # Solo necesitas correr esto la primera vez o si cambias dependencias
 
 using Raytracingjulia
 using LinearAlgebra
@@ -18,9 +18,10 @@ blackhole = KerrBH(a)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 1920
+x_pixels = 400
 
-detector = Detector(
+# CORRECCIÓN 1: Usamos el nombre del Struct (probablemente ImagePlane), no del Módulo
+detector = Detector.Detector( 
     D,
     iota,
     x_side;
@@ -31,22 +32,35 @@ detector = Detector(
 # =========================
 # ACCRETION STRUCTURE
 # =========================
-acc_structure = ThinDisk(blackhole)
+acc_structure = ThinDisk.ThinDisk(blackhole)
 
 # =========================
 # IMAGE GENERATION
 # =========================
 image = Image(blackhole, acc_structure, detector)
 
-image.create_photons()
-image.create_image()
+# CORRECCIÓN 2: Sintaxis de Julia (Funciones con signo de exclamación)
+println("Generando fotones...")
+create_photons!(image)
+
+println("Trazando rayos...")
+create_image!(image)
 
 # =========================
 # SAVE DATA
 # =========================
-filename = "Kerr_a_0.5_1920x1080"
+#filename = "Kerr_a_0.5_1920x1080"
 
-mkpath("images_data")
-NPZ.npy_save("images_data/$filename.npy", image.image_data)
+#mkpath("images_data")
+# Accedemos al campo .image_data del struct image
+#NPZ.npy_save("images_data/$filename.npy", image.image_data)
 
-image.plot(savefig=true, filename=filename)
+# CORRECCIÓN 3: Plotting
+#println("Guardando imagen...")
+#plot(image, savefig=true, filename=filename)
+
+println("Mostrando imagen de prueba...")
+
+# savefig=false evita que se cree el archivo .png
+# filename no es necesario si savefig es false
+plot(image, savefig=false)

@@ -1,9 +1,9 @@
 module Integrado
-
+using ..Common: doppler_shift, Photon
 using DifferentialEquations
 using Base: circshift
 
-using ..Common   # ← IMPORTANTE
+
 
 
 

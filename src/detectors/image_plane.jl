@@ -1,5 +1,7 @@
 module Detector
 
+using ..Kerr: KerrBH, metric, inverse_metric, Omega
+
 export Detector, photon_coords
 
 # ============================================================
@@ -56,7 +58,7 @@ end
 # Condiciones iniciales del fotón
 # ============================================================
 
-function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
+function photon_coords(d::Any, blackhole, alpha::Float64, beta::Float64;
                        freq::Float64=1.0)
 
     # Posición inicial (pantalla → BL)
@@ -71,7 +73,7 @@ function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
     x = [0.0, r, theta, phi]
 
     # Métrica
-    g_tt, g_rr, g_thth, g_phph, g_tph = blackhole.metric(x)
+    g_tt, g_rr, g_thth, g_phph, g_tph = metric(blackhole, x)
 
     # Componentes espaciales del momento
     k_th = sqrt(g_thth) * beta / d.D

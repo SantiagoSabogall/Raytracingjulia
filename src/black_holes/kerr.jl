@@ -70,7 +70,8 @@ function inverse_metric(b::KerrBH, x::Vector{<:Real})
         return [gtt, grr, gthth, gphph, gtph]
 end
 
-function geodesics(b::KerrBH, q::Vector{<:Real}, lmbda::Float64)
+
+function geodesics(q::Vector{<:Real}, b::KerrBH, lmbda::Real)
 
         r2 = q[2]*q[2]
         a2 = b.a*b.a
