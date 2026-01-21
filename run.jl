@@ -18,7 +18,7 @@ blackhole = KerrBH(a)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 400
+x_pixels = 900
 
 # CORRECCIÓN 1: Usamos el nombre del Struct (probablemente ImagePlane), no del Módulo
 detector = Detector.Detector( 

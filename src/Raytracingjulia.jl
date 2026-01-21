@@ -1,83 +1,36 @@
 module Raytracingjulia
 
+using LinearAlgebra
+using Plots
+using DifferentialEquations
 
+# --- 1. DECLARACIÓN DE FUNCIONES BASE ---
+# Esto permite que todos los módulos extiendan la MISMA función
+function metric end
+function inverse_metric end
+function geodesics end
+function Omega end
+
+export metric, inverse_metric, geodesics, Omega
+
+# --- 2. INCLUSIÓN DE SUBMÓDULOS ---
 include("black_holes/schwarzschild.jl")
 include("black_holes/kerr.jl")
-include("black_holes/num_schwarzschild.jl")
-#include("black_holes/scalar_hair_BH.jl")
-
-using .Schwarzschild
-using .Kerr
-using .SchwarzschildNumerical
-
-# 1. PRIMERO: Common (Estructuras de datos base, tipos de fotones, etc.)
-# Es vital porque los integradores y los agujeros negros suelen usar tipos definidos aquí.
+include("black_holes/num_schwarzschild.jl") # El que acabamos de agregar
 include("detectors/image_plane.jl")
-using .Detector
-
-
-
-# 2. SEGUNDO: Integradores
-# Los integradores necesitan a Common, pero no necesariamente a los agujeros negros todavía.
-
-include("common/common.jl")
-using .Common
-
-include("common/integrator.jl")
-include("common/integrator2.jl")
-using .Integrado
-using .Integrators
-
-# 3. TERCERO: Black Holes
-# Las métricas usan los tipos de Common y a veces funciones del Integrador.
-
-
-# 4. CUARTO: Estructuras de acreción y detectores
-include("accretion_structures/simple_disk.jl")
 include("accretion_structures/thin_disk.jl")
-using .SimpleDisk
-using .ThinDisk
+include("common/common.jl")
 
+# --- 3. EXPORTACIÓN DE TIPOS Y MÉTODOS PARA EL USUARIO ---
+using .Schwarzschild: SchwarzschildBH
+using .Kerr: KerrBH
+using .SchwarzschildNumerical: SchwarzschildNumBH
+using .Detector: Detector
+using .ThinDisk: ThinDisk
+using .Common: Image, create_photons!, create_image!, plot
 
-
-# ============================================================
-# Detector
-# ============================================================
-
-include("detectors/image_plane.jl")
-using .Detector
-
-# ============================================================
-
-
-# ============================================================
-# Public API
-# ============================================================
-
-export
-    # --- Black holes ---
-    Schwarzschild,
-    KerrBH,
-    SchwarzschildNumBH,
-
-    # --- Accretion ---
-    SimpleDisk,
-    ThinDisk,
-
-    # --- Detector ---
-    Detector,
-    photon_coords,
-
-    # --- Image / Ray tracing ---
-    Image,
-    create_photons!,
-    create_image!,
-    create_image_no_Doppler!,
-    create_shadow!,
-    plot,
-    plot_shadow,
-    plot_contours,
-    save_data,
-    verify_Hamiltonian
+export SchwarzschildBH, KerrBH, SchwarzschildNumBH
+export Detector, ThinDisk, Image
+export create_photons!, create_image!, plot
 
 end # module
