@@ -2,7 +2,7 @@ module Common
 
 using ..Detector: photon_coords
 using ..Kerr: metric, inverse_metric, Omega, geodesics
-#using ..Schwarzschild: metric, inverse_metric
+using ..Schwarzschild: metric, inverse_metric, Omega, geodesics
 
 using DifferentialEquations
 using Base.Threads
@@ -56,6 +56,7 @@ function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
     sol = solve(prob, Tsit5(), 
                 reltol=1e-8, 
                 abstol=1e-8, 
+                verbose=false,
                 saveat=lmbda_range)
                     
 
@@ -96,6 +97,7 @@ function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, det
         prob,
         Vern7(),
         adaptive=false,
+        verbose=false,
         saveat=λ
     )
 
@@ -132,6 +134,7 @@ function shadow_integ(p::Photon, blackhole, detector)
         prob,
         Vern7(),
         adaptive=false,
+        verbose=false,
         saveat=λ
     )
 
@@ -237,29 +240,30 @@ function create_image!(img::Image)
     println("Total time: ", round(time() - t0, digits=2), " s")
 end
 
-# ============================================================
-# Visualization
-# ============================================================
-
-function plot(img::Image; savefig=false, filename=nothing, cmap=:afmhot)
-
+function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
+    # 1. Normalizar datos
     maxv = maximum(img.image_data)
     data = maxv > 0 ? img.image_data ./ maxv : img.image_data
 
+    # 2. Crear el heatmap
     plt = heatmap(
         transpose(data),
-        aspect_ratio=1,
-        c=cmap,
-        axis=false,
-        framestyle=:none
+        aspect_ratio = 1,
+        c = cmap,
+        axis = false,
+        framestyle = :none
     )
 
-    if savefig && filename !== nothing
+    # 3. Lógica de guardado
+    if save && !isnothing(filename)
         mkpath("images")
-        savefig(plt, "images/$filename.png")
+        # Usamos Plots.savefig para evitar que Julia use tu variable 'save'
+        Plots.savefig(plt, "images/$filename.png")
+        println("Imagen guardada en: images/$filename.png")
     end
 
     display(plt)
+    return plt
 end
 
 end # module Common
