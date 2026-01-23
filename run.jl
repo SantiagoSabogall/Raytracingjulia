@@ -1,7 +1,7 @@
 using Pkg
 Pkg.activate(@__DIR__)
 # Pkg.instantiate() # Solo necesitas correr esto la primera vez o si cambias dependencias
-import .Raytracingjulia
+using Raytracingjulia
 using LinearAlgebra
 using NPZ
 
@@ -24,7 +24,7 @@ detector = Detector.Detector(
     x_side;
     x_pixels = x_pixels,
     ratio = "16:9"
-)
+)                                                                                                                   
 
 
 acc_structure = ThinDisk.ThinDisk(blackhole)
