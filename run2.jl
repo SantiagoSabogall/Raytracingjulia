@@ -1,57 +1,51 @@
-using Pkg
-Pkg.activate(@__DIR__)
+# 1. Cargar tus módulos (ajusta las rutas si es necesario)
+include("src/black_holes/kerr.jl")
+include("src/detectors/image_plane.jl")
+include("src/common/common.jl")
+include("src/accretion_structures/thin_disk.jl")
 
-using Raytracingjulia
-using LinearAlgebra
-using NPZ
-using Plots
+using .Kerr, .Detector, .Common, .ThinDisk
+using DifferentialEquations
 
-# ============================================================
-# 1. OTRO AGUJERO NEGRO: Schwarzschild (a = 0)
-# ============================================================
-# Si no tienes un struct SchwarzschildBH, puedes usar Kerr con a = 0.0001
-bh = SchwarzschildBH() 
+# 2. Configuración mínima igual a la de tu script de Python
+a = 0.5
+bh = Kerr.BlackHole(a)
+dist = 100.0
+inc = (pi/180) * 85.0
+det = Detector.detector(D=dist, iota=inc, x_pixels=400, x_side=25)
 
-# =========================
-# 2. CONFIGURACIÓN DEL DETECTOR
-# =========================
-D = 40.0                # Más cerca para reducir errores de propagación
-iota = 45 * pi / 180    # Inclinación moderada (45°) para ver el disco desde arriba
-x_side = 40.0           # Campo de visión amplio para no "perder" el disco
-x_pixels = 400
+# 3. EL TEST (Copia y pega esto)
+test_alpha = 5.0 
+test_beta = 2.0  # Un poco de altura para que cruce el plano
 
-detector = Detector.Detector(D, iota, x_side; x_pixels = x_pixels, ratio = "1:1")
+println("--- INICIANDO DEBUG DE FOTÓN ---")
+p = Common.Photon(test_alpha, test_beta)
+# Generar condiciones iniciales
+p.iC = Detector.photon_coords(det, bh, test_alpha, test_beta)
 
-# =========================
-# 3. OTRO DISCO: Disco Simple (Intensidad Constante)
-# =========================
-# Usaremos un disco que emite luz uniforme para verificar geometría
-acc_structure = ThinDisk.ThinDisk(bh)
-acc_structure.in_edge = 6.0    # ISCO de Schwarzschild es 6.0
-acc_structure.out_edge = 30.0  # Un disco muy grande
-# Forzamos intensidad constante de 1.0 para pruebas
-acc_structure.intensity = (r) -> 1.0 
+println("Condiciones Iniciales (iC): ", p.iC)
 
-# =========================
-# 4. EJECUCIÓN
-# =========================
-img = Image(bh, acc_structure, detector)
+final_λ = 1.5 * det.D
+tspan = (0.0, -final_λ)
 
-println("--- Simulando Schwarzschild con Disco Simple ---")
-create_photons!(img)
-create_image!(img)
+# Usamos la función de geodésicas que definiste en Kerr
+prob = ODEProblem(Kerr.geodesics, p.iC, tspan, bh)
+sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
 
-# =========================
-# 5. DIAGNÓSTICO Y VISUALIZACIÓN
-# =========================
-max_int = maximum(img.image_data)
-println("Intensidad máxima: $max_int")
+# 4. Verificación de cruce de plano (Theta)
+thetas = [u[3] for u in sol.u]
+println("Rango de theta: $(minimum(thetas)) a $(maximum(thetas))")
+# El plano ecuatorial es pi/2 ≈ 1.5708
+cruzó = any(thetas .> 1.5708) && any(thetas .< 1.5708)
+println("¿Cruzó el plano ecuatorial (pi/2)? ", cruzó)
 
-if max_int > 0
-    # Usamos un mapa de colores diferente (Inferno) para variar
-    plot(img, savefig=true, filename="Schwarzschild_Test", cmap=:inferno)
-else
-    println("⚠️ Sigue saliendo negro. Probemos con iota = 0 (vista desde el polo).")
-end
+# 5. Verificación de radios
+radios = [u[2] for u in sol.u]
+println("Radio inicial: ", radios[1])
+println("Radio mínimo alcanzado: ", minimum(radios))
 
-println("Presiona ENTER para salir..."); readline()
+# 6. Verificación de impacto con el disco
+# Intentamos correr la lógica de integración completa para este fotón
+acc = ThinDisk.ThinDisk(bh)
+I_f = Common.geodesics_integrate(p, bh, acc, det)
+println("Intensidad final detectada: ", I_f)

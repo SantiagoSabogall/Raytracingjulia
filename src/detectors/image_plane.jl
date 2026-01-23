@@ -84,7 +84,7 @@ function photon_coords(d::Any, blackhole, alpha::Float64, beta::Float64;
           alpha * g_tph / (d.D * sqrt(g_phph))
 
     term_r = 1.0 - (k_th^2 / g_thth) - (k_ph^2 / g_phph)
-    k_r = -sqrt(g_rr * max(0.0, term_r))   # fotón entrante
+    k_r = sqrt(g_rr * max(0.0, term_r))   # fotón entrante
 
     k = [k_t, k_r, k_th, k_ph]
 
