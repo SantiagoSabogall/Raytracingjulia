@@ -1,8 +1,9 @@
-module Kerr  # solo para el commit
-
-import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
+module Kerr  
 
 export KerrBH
+
+# IMPORTANTE: Usamos 'import' para poder extender las funciones del padre
+import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
 using LinearAlgebra
 

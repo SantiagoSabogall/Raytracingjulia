@@ -1,6 +1,7 @@
-module Detector
+module ImagePlane
 
-using ..Kerr: KerrBH, metric, inverse_metric, Omega
+using ..Raytracingjulia: metric
+
 
 export Detector, photon_coords
 
@@ -58,7 +59,7 @@ end
 # Condiciones iniciales del fotón
 # ============================================================
 
-function photon_coords(d::Any, blackhole, alpha::Float64, beta::Float64;
+function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
                        freq::Float64=1.0)
 
     # Posición inicial (pantalla → BL)

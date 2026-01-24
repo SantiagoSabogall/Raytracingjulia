@@ -1,3 +1,5 @@
+# kerr blackhole using simple_disk accretion structure
+
 using Pkg
 Pkg.activate(@__DIR__)
 Pkg.instantiate()
@@ -32,7 +34,7 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = ThinDisk.ThinDisk(blackhole)
+acc_structure = SimpleDisk.SimpleDisk(blackhole)
 
 # ----------------------------
 # Imagen
@@ -45,7 +47,7 @@ create_photons!(image)
 println("Trazando rayos...")
 create_image!(image)
 
-filename = "Kerr_a_0.5_80x45_thin_disk_test.png"
+filename = "Kerr_a_0.5_80x45_simple_disk_test.png"
 
 println("Mostrando imagen de prueba...")
 plot(image, save=true, filename=filename)

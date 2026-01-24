@@ -1,8 +1,8 @@
 module Common
 
-using ..Detector: photon_coords
-using ..Kerr: metric, inverse_metric, Omega, geodesics
-using ..Schwarzschild: metric, inverse_metric, Omega, geodesics
+using ..ImagePlane: photon_coords
+using ..Raytracingjulia: metric, inverse_metric, Omega, geodesics
+
 
 using DifferentialEquations
 using Base.Threads
@@ -251,7 +251,8 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
         aspect_ratio = 1,
         c = cmap,
         axis = false,
-        framestyle = :none
+        framestyle = :none,
+        colorbar = false
     )
 
     # 3. Lógica de guardado

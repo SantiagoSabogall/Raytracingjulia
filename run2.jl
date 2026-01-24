@@ -1,24 +1,38 @@
+############################################################
+# run_schwarzschild_num.jl
+############################################################
+
 using Pkg
 Pkg.activate(@__DIR__)
-# Pkg.instantiate() # Solo necesitas correr esto la primera vez o si cambias dependencias
-import .Raytracingjulia
+Pkg.instantiate()
+
+# ----------------------------
+# Revise para recargar cambios sin reiniciar Julia
+# ----------------------------
+using Revise
+using Raytracingjulia
 using LinearAlgebra
 using NPZ
 
+############################################################
+# Configuración del agujero negro numérico (Schwarzschild)
+############################################################
 
+# Aquí pasamos las rutas de tus datos numéricos
+path_N   ="src/black_holes/numerical_data/schwarzschild_data/N.txt"
+path_dN  = "src/black_holes/numerical_data/schwarzschild_data/derN.txt"
 
+blackhole = SchwarzschildNumBH(path_N, path_dN)
 
-a = 0.5
-blackhole = SchwarzschildBH(a)
-
-
-D =100.0
+############################################################
+# Detector
+############################################################
+D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 100
+x_pixels = 80
 
-
-detector = Detector.Detector( 
+detector = Detector(
     D,
     iota,
     x_side;
@@ -26,29 +40,28 @@ detector = Detector.Detector(
     ratio = "16:9"
 )
 
-
+############################################################
+# Estructura de acreción
+############################################################
 acc_structure = ThinDisk.ThinDisk(blackhole)
 
-
+############################################################
+# Imagen
+############################################################
 image = Image(blackhole, acc_structure, detector)
 
+############################################################
+# Crear fotones y trazar rayos
+############################################################
 println("Generando fotones...")
 create_photons!(image)
 
 println("Trazando rayos...")
 create_image!(image)
 
-filename = "Kerr_a_0.5_100"
-
-#mkpath("images_data")
-# Accedemos al campo .image_data del struct image
-#NPZ.npy_save("images_data/$filename.npy", image.image_data)
-
-# CORRECCIÓN 3: Plotting
-#println("Guardando imagen...")
-#plot(image, savefig=true, filename=filename)
-
-println("Mostrando imagen de prueba...")
-
-plot(image, filename=filename)
-
+############################################################
+# Guardar imagen
+############################################################
+filename = "num_schwarzschild_80x45_thin_disk.png"
+println("Mostrando imagen de prueba y guardando como $filename ...")
+plot(image, save=true, filename=filename)

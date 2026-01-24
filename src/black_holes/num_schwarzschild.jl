@@ -3,10 +3,11 @@ module SchwarzschildNumerical
 using Dierckx
 using DelimitedFiles
 
-# IMPORTANTE: Importar para extender las funciones base
-import ..Raytracingjulia: metric, inverse_metric, geodesics
-
 export SchwarzschildNumBH, dr_inverse_metric
+
+import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
+
+
 
 mutable struct SchwarzschildNumBH
     rN::Vector{Float64}
@@ -39,6 +40,11 @@ mutable struct SchwarzschildNumBH
     end
 end
 
+function Omega(b::SchwarzschildNumBH, r::Real; corotating::Bool=true)
+    return 1 / r^(3/2)
+end
+
+
 # -------------------------
 # Métodos Extendidos
 # -------------------------
@@ -54,7 +60,7 @@ function metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
     g_phph = (r*sin(θ))^2
     g_tph  = 0.0
 
-    return [g_tt, g_rr, g_thth, g_phph, g_tph] # Retornamos Vector para consistencia
+    return g_tt, g_rr, g_thth, g_phph, g_tph
 end
 
 function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
@@ -68,7 +74,7 @@ function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
     gphph = 1 / (r*sin(θ))^2
     gtph  = 0.0
 
-    return [gtt, grr, gthth, gphph, gtph]
+    return gtt, grr, gthth, gphph, gtph
 end
 
 # Función auxiliar (no necesita ser extendida si solo se usa aquí)
@@ -84,7 +90,7 @@ function dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
     drgphph = -2 / (r^3*sin(θ)^2)
     drgtph  = 0.0
 
-    return [drgtt, drgrr, drgthth, drgphph, drgtph]
+    return drgtt, drgrr, drgthth, drgphph, drgtph
 end
 
 # Firma corregida (q, b, lambda)
