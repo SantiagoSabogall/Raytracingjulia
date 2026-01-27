@@ -44,10 +44,10 @@ image = Image(blackhole, acc_structure, detector)
 
 create_photons!(image)
 
-println("Trazando rayos...")
-create_image!(image)
+
+create_shadow!(image)
 
 filename = "Kerr_a_0.5_80x45_simple_disk_test.png"
 
-println("Mostrando imagen de prueba...")
-plot(image, save=true, filename=filename)
+
+plot_shadow(image, filename=filename)

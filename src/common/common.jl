@@ -88,18 +88,15 @@ end
 function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, detector)
 
     final_λ = 1.5 * detector.D
-    λ = range(0.0, -final_λ, length=Int(7 * final_λ))
-    tspan = (λ[1], λ[end])
+    lmbda_range = range(0.0, -final_λ, length=Int(7 * final_λ))
+    tspan = (lmbda_range[1], lmbda_range[end])
 
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-
-    sol = solve(
-        prob,
-        Vern7(),
-        adaptive=false,
-        verbose=false,
-        saveat=λ
-    )
+    sol = solve(prob, Tsit5(), 
+                reltol=1e-8, 
+                abstol=1e-8, 
+                verbose=false,
+                saveat=lmbda_range)
 
     p.fP = zeros(8)
 
@@ -125,18 +122,15 @@ end
 function shadow_integ(p::Photon, blackhole, detector)
 
     final_λ = 1.5 * detector.D
-    λ = range(0.0, -final_λ, length=Int(7 * final_λ))
-    tspan = (λ[1], λ[end])
+    lmbda_range = range(0.0, -final_λ, length=Int(7 * final_λ))
+    tspan = (lmbda_range[1], lmbda_range[end])
 
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-
-    sol = solve(
-        prob,
-        Vern7(),
-        adaptive=false,
-        verbose=false,
-        saveat=λ
-    )
+    sol = solve(prob, Tsit5(), 
+                reltol=1e-8, 
+                abstol=1e-8, 
+                verbose=false,
+                saveat=lmbda_range)
 
     rs = [u[2] for u in sol.u]
     indxs = findall(r -> r < blackhole.EH + 1e-7, rs)
@@ -292,7 +286,7 @@ function create_image_no_Doppler!(img::Image)
 
     for p in img.photon_list
         img.image_data[p.i, p.j] =
-            geo_integ_no_Doppler(p, img.blackhole, img.acc_structure, img.detector)
+            geodesics_integrate_no_Doppler(p, img.blackhole, img.acc_structure, img.detector)
 
         print("\rPhoton # $photon")
         flush(stdout)
@@ -366,7 +360,7 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
     return plt
 end
 
-function plot_shadow(img; savefig=false, filename=nothing, cmap=:gray)
+function plot_shadow(img; save=false, filename=nothing, cmap=:gray)
 
     # Normalizar la imagen
     img.image_data ./= maximum(img.image_data)
@@ -383,24 +377,22 @@ function plot_shadow(img; savefig=false, filename=nothing, cmap=:gray)
     xlabel!(plt, "α")
     ylabel!(plt, "β")
 
-    grid!(plt, true)
-
-    if savefig && filename !== nothing
+    # CORRECCIÓN: Usar la variable 'save', no la función 'savefig'
+    if save && filename !== nothing
         savefig(plt, "images/$(filename).png")
     end
 
     display(plt)
 end
 
-function plot_contours(img; savefig=false, filename=nothing, cmap=:gray)
+function plot_contours(img; save=false, filename=nothing, cmap=:gray)
 
     plt = contour(
         img.image_data',
         aspect_ratio = :equal,
         color = cmap,
         framestyle = :none,
-        grid = true,
-        gridalpha = 0.25
+
     )
 
     xlabel!(plt, "α")
