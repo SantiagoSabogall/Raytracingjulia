@@ -66,7 +66,7 @@ function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
 
     zi  = [cos(u[3]) for u in sol.u]
     zi1 = circshift(zi, -1)
-    zi1[end] = zi[end]
+    zi1[end] = 0.0
 
     indxs = findall(zi .* zi1 .< 0)
 
@@ -168,6 +168,48 @@ function doppler_shift(p::Photon, I0::Float64, blackhole)
     return I0 * g^3
 end
 
+function integrate_for_H(p::Photon, blackhole, acc_structure, detector)
+
+    final_lmbda = 1.5 * detector.D
+    lmbda = range(0.0, -final_lmbda, length = Int(7 * final_lmbda))
+    tspan = (lmbda[1], lmbda[end])
+
+    prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
+
+    sol = solve(prob, Tsit5(),
+                reltol = 1e-8,
+                abstol = 1e-8,
+                saveat = lmbda)
+
+    solution = sol.u
+
+    zi  = [cos(u[3]) for u in sol.u]
+    zi1 = circshift(zi, -1)
+    zi1[end] = 0.0
+
+    indxs = findall(zi .* zi1 .< 0)
+
+    for i in indxs
+        r = sol.u[i][2]
+        if acc_structure.in_edge < r < acc_structure.out_edge
+            solution = sol.u[1:i]
+            break
+        end
+    end
+
+    rEH = [u[2] for u in sol.u]
+    indxsEH = findall(rEH .< blackhole.EH + 0.1)
+
+    for i in indxsEH
+        solution = sol.u[1:i]
+    end
+
+    H = Hamiltonian(solution, blackhole)
+    return H
+end
+
+
+
 function Hamiltonian(sol::Vector{Vector{Float64}}, blackhole)
 
     H = zeros(length(sol))
@@ -177,14 +219,13 @@ function Hamiltonian(sol::Vector{Vector{Float64}}, blackhole)
         p = sol[i][5:8]
 
         gtt, grr, gθθ, gφφ, gtφ = inverse_metric(blackhole, x)
-
-        H[i] = 0.5 * (
-            gtt*p[1]^2 +
-            grr*p[2]^2 +
-            gθθ*p[3]^2 +
-            gφφ*p[4]^2 +
-            2gtφ*p[1]*p[4]
-        )
+    H[i] = 0.5 * (
+        gtt * p[1]^2 +
+        grr * p[2]^2 +
+        gθθ * p[3]^2 +
+        gφφ * p[4]^2 +
+        2 * gtφ * p[1] * p[4]
+        )  
     end
 
     return H
@@ -239,6 +280,64 @@ function create_image!(img::Image)
 
     println("Total time: ", round(time() - t0, digits=2), " s")
 end
+function create_image_no_Doppler!(img::Image)
+
+    # Inicializar la imagen
+    img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
+
+    photon = 1
+    println("Integrating trajectories ...")
+
+    start_time = time()
+
+    for p in img.photon_list
+        img.image_data[p.i, p.j] =
+            geo_integ_no_Doppler(p, img.blackhole, img.acc_structure, img.detector)
+
+        print("\rPhoton # $photon")
+        flush(stdout)
+
+        photon += 1
+    end
+
+    total_time = time() - start_time
+
+    println("\n\n--- Total time of integration : $total_time seconds ---")
+    println(
+        "\n--- Time of integration : $(total_time / length(img.photon_list)) seconds/photon ---\n"
+    )
+end
+
+
+function create_shadow!(img::Image)
+
+    # Inicializar la imagen
+    img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
+
+    photon = 1
+    println("Integrating trajectories ...")
+
+    start_time = time()
+
+    for p in img.photon_list
+        img.image_data[p.i, p.j] =
+            shadow_integ(p, img.blackhole, img.detector)
+
+        print("\rPhoton # $photon")
+        flush(stdout)
+
+        photon += 1
+    end
+
+    total_time = time() - start_time
+
+    println("\n\nEH radius $(img.blackhole.EH)  ---")
+    println("\n\n--- Total time of integration : $total_time seconds ---")
+    println(
+        "\n--- Time of integration : $(total_time / length(img.photon_list)) seconds/photon ---\n"
+    )
+end
+
 
 function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
     # 1. Normalizar datos
@@ -265,6 +364,88 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
 
     display(plt)
     return plt
+end
+
+function plot_shadow(img; savefig=false, filename=nothing, cmap=:gray)
+
+    # Normalizar la imagen
+    img.image_data ./= maximum(img.image_data)
+
+    # Mostrar imagen
+    plt = heatmap(
+        img.image_data',
+        aspect_ratio = :equal,
+        color = cmap,
+        yflip = true,
+        framestyle = :none
+    )
+
+    xlabel!(plt, "α")
+    ylabel!(plt, "β")
+
+    grid!(plt, true)
+
+    if savefig && filename !== nothing
+        savefig(plt, "images/$(filename).png")
+    end
+
+    display(plt)
+end
+
+function plot_contours(img; savefig=false, filename=nothing, cmap=:gray)
+
+    plt = contour(
+        img.image_data',
+        aspect_ratio = :equal,
+        color = cmap,
+        framestyle = :none,
+        grid = true,
+        gridalpha = 0.25
+    )
+
+    xlabel!(plt, "α")
+    ylabel!(plt, "β")
+
+    if savefig && filename !== nothing
+        savefig(plt, "images/$(filename).png")
+    end
+
+    display(plt)
+end
+
+function verify_Hamiltonian(img::Image; n::Int=10)
+
+    # Verificar que la métrica inversa exista
+    if !hasproperty(img.blackhole, :inverse_metric)
+        println("The inverse metric is not defined for this black hole.")
+        println("Please, check the black hole definition.")
+        return
+    end
+
+    photon = 0
+    println("Integrating trajectories ...\n")
+
+    plt = plot(size = (1000, 700))
+
+    while photon < n
+        i = rand(1:length(img.photon_list))
+        p = img.photon_list[i]
+
+        H = integrate_for_H(p, img.blackhole, img.acc_structure, img.detector)
+
+        plot!(plt, H, label = "Photon # $i")
+
+        photon += 1
+    end
+
+    xlabel!(plt, "λ")
+    ylabel!(plt, "H")
+    ylims!(plt, -2, 2)
+
+    grid!(plt, true)
+    display(plt)
+
+    println()
 end
 
 end # module Common
