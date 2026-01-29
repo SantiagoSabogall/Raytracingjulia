@@ -1,5 +1,3 @@
-# kerr blackhole using simple_disk accretion structure
-
 using Pkg
 Pkg.activate(@__DIR__)
 Pkg.instantiate()
@@ -21,7 +19,7 @@ blackhole = KerrBH(a)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 80
+x_pixels = 90
 
 detector = Detector(
     D,
@@ -34,7 +32,7 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = SimpleDisk.SimpleDisk(blackhole)
+acc_structure = ThinDisk.ThinDisk(blackhole)
 
 # ----------------------------
 # Imagen
@@ -44,10 +42,10 @@ image = Image(blackhole, acc_structure, detector)
 
 create_photons!(image)
 
+println("Trazando rayos...")
 
 create_shadow!(image)
 
-filename = "Kerr_a_0.5_80x45_simple_disk_test.png"
+filename = "Kerr_a_0.5_90_shadow_test.png"
 
-
-plot_shadow(image, filename=filename)
+plot_shadow(image, save=true, filename=filename)

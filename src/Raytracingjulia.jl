@@ -30,10 +30,10 @@ using .SchwarzschildNumerical: SchwarzschildNumBH, dr_inverse_metric
 using .ImagePlane: Detector
 using .ThinDisk: ThinDisk
 using .SimpleDisk: SimpleDisk
-using .Common: Image, create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift
+using .Common: Image, create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift, plot
 
 export SchwarzschildBH, KerrBH, SchwarzschildNumBH, dr_inverse_metric
 export Detector, ThinDisk, SimpleDisk, Image
-export create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift
+export create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift, plot
 
 end # module
