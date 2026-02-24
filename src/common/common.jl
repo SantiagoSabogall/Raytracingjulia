@@ -142,14 +142,14 @@ function shadow_integ(p::Photon, blackhole, detector)
     final_λ = 1.5 * detector.D
     tspan = (0.0, -final_λ)
 
-    # Reutilizamos el callback de terminación para que sea ultra rápido
+    
     condition(u, t, integrator) = u[2] - (blackhole.EH + 1e-7)
     affect!(integrator) = terminate!(integrator)
     cb = ContinuousCallback(condition, affect!)
 
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
     
-    # IMPORTANTE: save_everystep=false para no llenar la RAM
+
     sol = solve(prob, Tsit5(), 
                 reltol=1e-8, 
                 abstol=1e-8, 
@@ -157,16 +157,13 @@ function shadow_integ(p::Photon, blackhole, detector)
                 callback=cb,
                 save_everystep=false)
 
-    # Lógica de la Sombra:
-    # Si la integración terminó PORQUE tocó el horizonte, el radio final será ≈ EH
-    # Si terminó porque se acabó el tiempo (final_λ), el radio será grande.
-    
+
     r_final = sol.u[end][2]
     
-    if r_final < blackhole.EH + 1e-3 # Un margen un poco más generoso
-        return 0.0   # Sombra (Negro)
+    if r_final < blackhole.EH + 1e-3 
+        return 0.0   
     else
-        return 100.0 # Cielo / Fondo (Blanco)
+        return 100.0 
     end
 end
 # ============================================================
@@ -205,14 +202,14 @@ function integrate_for_H(p::Photon, blackhole, acc_structure, detector)
                 abstol = 1e-8,
                 saveat = lmbda_range)
 
-    # Empezamos con la solución completa
+
     solution = sol.u
     last_idx = length(sol.u)
 
-    # --- Lógica de corte por Disco de Acreción ---
+
     zi = [cos(u[3]) for u in sol.u]
     zi1 = circshift(zi, -1)
-    zi1[end] = zi[end] # Evitar el 0.0 para que el signo sea consistente
+    zi1[end] = zi[end] 
 
     indxs = findall(zi .* zi1 .< 0)
     for i in indxs
@@ -223,19 +220,18 @@ function integrate_for_H(p::Photon, blackhole, acc_structure, detector)
         end
     end
 
-    # --- Lógica de corte por Horizonte de Sucesos (EH) ---
+
     rEH = [u[2] for u in sol.u]
     idxEH = findfirst(r -> r < (blackhole.EH + 0.05), rEH)
     
     if !isnothing(idxEH) && idxEH < last_idx
         last_idx = idxEH
     end
-
-    # Recortamos la solución y los tiempos hasta el punto de impacto/caída
+ída
     final_solution = sol.u[1:last_idx]
     final_lambdas = sol.t[1:last_idx]
 
-    # Calculamos el vector de Hamiltonianos
+
     H = Hamiltonian(final_solution, blackhole)
 
     return final_lambdas, H
@@ -315,7 +311,7 @@ function create_image!(img::Image)
 end
 function create_image_no_Doppler!(img::Image)
 
-    # Inicializar la imagen
+   
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
 
     photon = 1
@@ -343,7 +339,7 @@ end
 
 
 function create_shadow!(img::Image)
-    # 1. Aseguramos que la matriz esté limpia
+    
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
     
     n_photons = length(img.photon_list)
@@ -351,22 +347,22 @@ function create_shadow!(img::Image)
 
     start_time = time()
 
-    # 2. El truco mágico: @threads reparte los fotones entre tus núcleos
+    
     @threads for p in img.photon_list
-        # Guardamos el resultado directamente en la matriz
+        
         img.image_data[p.i, p.j] = shadow_integ(p, img.blackhole, img.detector)
     end
 
     total_time = time() - start_time
     
-    # 3. Reporte final
+    
     println("\n\nEH radius: $(img.blackhole.EH)")
     println("--- Total time: $(round(total_time, digits=2)) seconds ---")
     println("--- Speed: $(round(total_time/n_photons, digits=6)) seconds/photon ---")
 end
 
 function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
-    # 1. Normalizar datos
+    
     maxv = maximum(img.image_data)
     data = maxv > 0 ? img.image_data ./ maxv : img.image_data
 
@@ -380,10 +376,10 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
         colorbar = false
     )
 
-    # 3. Lógica de guardado
+   
     if save && !isnothing(filename)
         mkpath("images")
-        # Usamos Plots.savefig para evitar que Julia use tu variable 'save'
+       
         Plots.savefig(plt, "images/$filename.png")
         println("Imagen guardada en: images/$filename.png")
     end
@@ -393,36 +389,34 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
 end
 
 function plot_shadow(img; save=false, filename=nothing, cmap=:gray)
-    # 1. Copiamos los datos para no modificar la imagen original
+
     data = copy(img.image_data)
     
-    # 2. Normalización segura: Evita división por cero si la imagen está vacía
+
     maxv = maximum(data)
     if maxv > 0
         data .= data ./ maxv
     end
 
-    # 3. Crear el heatmap
-    # Usamos clims=(0, 1) para forzar que el negro sea 0 y blanco 1
     plt = heatmap(
-        data', # El operador ' es más rápido que transpose() en matrices grandes
+        data',
         aspect_ratio = :equal,
         c = cmap,
         clims = (0, 1), 
-        axis = true,       # Activamos ejes para ver las coordenadas alfa y beta
+        axis = true,       
         framestyle = :box,
         colorbar = false,
-        ticks = false      # Quita los números pero deja el marco si lo prefieres
+        ticks = false      
     )
 
-    # Etiquetas de coordenadas de impacto (α, β)
+
     xlabel!(plt, "α")
     ylabel!(plt, "β")
 
-    # 4. Guardado corregido
+
     if save && filename !== nothing
         if !isdir("images") mkpath("images") end
-        # Aseguramos la extensión .png
+
         full_path = endswith(filename, ".png") ? "images/$filename" : "images/$filename.png"
         Plots.savefig(plt, full_path)
         println("Sombra guardada en: $full_path")
@@ -434,26 +428,25 @@ end
 
 
 function plot_contours(img; save=false, filename=nothing, cmap=:gray)
-    # 1. Preparar los datos (transponer para que X e Y coincidan con el detector)
+
     data = img.image_data'
 
-    # 2. Crear el gráfico de contornos
     plt = contour(
         data,
         aspect_ratio = :equal,
         c = cmap,
-        fill = false,      # Solo líneas, no relleno
-        levels = 15,       # Cantidad de líneas de contorno
-        lw = 1.2,          # Grosor de línea (linewidth)
+        fill = false,     
+        levels = 15,       
+        lw = 1.2,          
         colorbar = false
     )
 
-    # 3. Estética de los ejes (limpio como en tu versión de Python)
+
     xlabel!(plt, "α")
     ylabel!(plt, "β")
     plot!(plt, grid=true, gridalpha=0.25, ticks=false)
 
-    # 4. Guardado de imagen
+
     if save && filename !== nothing
         if !isdir("images") mkpath("images") end
         full_path = endswith(filename, ".png") ? "images/$filename" : "images/$filename.png"
@@ -477,20 +470,20 @@ function verify_Hamiltonian(img::Image; n::Int=10)
         gridalpha = 0.3
     )
 
-    # Seleccionamos n índices aleatorios sin repetir
+
     indices = rand(1:length(img.photon_list), n)
 
     for i in indices
         p = img.photon_list[i]
         
-        # Ahora recibe la tupla (lambdas, H_vals)
+
         lambdas, H_vals = integrate_for_H(p, img.blackhole, img.acc_structure, img.detector)
 
         Plots.plot!(plt, lambdas, H_vals, label = "Photon #$i")
     end
 
-    # La escala es crucial: queremos ver desviaciones muy pequeñas cerca de 0
+
     
     display(plt)
 end
-end # module Common
+end 
