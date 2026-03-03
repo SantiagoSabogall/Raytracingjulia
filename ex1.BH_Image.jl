@@ -19,7 +19,7 @@ blackhole = KerrBH(a)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 90
+x_pixels = 100
 
 detector = Detector(
     D,
@@ -32,8 +32,16 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = ThinDisk.ThinDisk(blackhole)
-
+#  Estructura de acrecion para KerrPFDM
+""" 
+acc_structure = SimpleDisk.SimpleDisk(
+    blackhole;
+    R_min = 3.0
+)
+"""  
+acc_structure = ThinDisk.ThinDisk(
+    blackhole
+)
 # ----------------------------
 # Imagen
 # ----------------------------
@@ -42,10 +50,10 @@ image = Image(blackhole, acc_structure, detector)
 
 create_photons!(image)
 
-println("Trazando rayos...")
-create_image!(image)
 
-filename = "Kerr_a_0.5_900_thin_disk_test.png"
+create_image_no_Doppler!(image)
+
+filename = "Kerr_a_0.5_900_thin_disk_test"
 
 println("Mostrando imagen de prueba...")
 plot(image, save=true, filename=filename)

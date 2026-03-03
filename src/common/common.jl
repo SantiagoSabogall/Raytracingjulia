@@ -118,26 +118,7 @@ function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, det
 
     return 0.0
 end
-"""
-function shadow_integ(p::Photon, blackhole, detector)
 
-    final_λ = 1.5 * detector.D
-    lmbda_range = range(0.0, -final_λ, length=Int(7 * final_λ))
-    tspan = (lmbda_range[1], lmbda_range[end])
-
-    prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-    sol = solve(prob, Tsit5(), 
-                reltol=1e-8, 
-                abstol=1e-8, 
-                verbose=false,
-                saveat=lmbda_range)
-
-    rs = [u[2] for u in sol.u]
-    indxs = findall(r -> r < blackhole.EH + 1e-7, rs)
-
-    return isempty(indxs) ? 100.0 : 0.0
-end
-"""
 function shadow_integ(p::Photon, blackhole, detector)
     final_λ = 1.5 * detector.D
     tspan = (0.0, -final_λ)
@@ -180,6 +161,9 @@ function doppler_shift(p::Photon, I0::Float64, blackhole)
     g_tt, _, _, g_phph, g_tph = metric(blackhole, coords)
 
     Ω = Omega(blackhole, p.fP[2])
+    if !isfinite(Ω)
+        return 0.0
+    end
 
     k_t   = p.fP[5]
     k_phi = p.fP[8]
@@ -298,16 +282,23 @@ function create_image!(img::Image)
 
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
 
-    println("Integrating with ", nthreads(), " threads...")
+    println("Integrating trajectories with ", nthreads(), " threads...")
     t0 = time()
 
     @threads for k in eachindex(img.photon_list)
         p = img.photon_list[k]
         img.image_data[p.i, p.j] =
             geodesics_integrate(p, img.blackhole, img.acc_structure, img.detector)
+
+        print("\rPhoton # $photon")
+        flush(stdout)
+
+        photon += 1
     end
 
     println("Total time: ", round(time() - t0, digits=2), " s")
+    println(
+        "\n--- Time of integration : $(total_time / length(img.photon_list)) seconds/photon ---\n")
 end
 function create_image_no_Doppler!(img::Image)
 
@@ -315,7 +306,7 @@ function create_image_no_Doppler!(img::Image)
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
 
     photon = 1
-    println("Integrating trajectories ...")
+    println("Integrating trajectories with", nthreads(), "threads...")
 
     start_time = time()
 
