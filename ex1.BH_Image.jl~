@@ -53,7 +53,7 @@ create_photons!(image)
 
 create_image_no_Doppler!(image)
 
-filename = "Kerr_a_0.5_1920"
+filename = "Kerr_a_0.5_900_thin_disk_test"
 
 println("Mostrando imagen de prueba...")
 plot(image, save=true, filename=filename)
