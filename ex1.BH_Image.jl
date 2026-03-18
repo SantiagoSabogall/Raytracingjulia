@@ -39,7 +39,7 @@ acc_structure = SimpleDisk.SimpleDisk(
     R_min = 3.0
 )
 """  
-acc_structure = ThinDisk.ThinDisk(
+acc_structure = ThinDisk(
     blackhole
 )
 # ----------------------------

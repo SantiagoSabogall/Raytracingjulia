@@ -1,4 +1,4 @@
-module ThinDisk
+module ThinDiskmod
 
 export ThinDisk, intensity,f
 

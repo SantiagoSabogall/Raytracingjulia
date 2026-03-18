@@ -1,4 +1,4 @@
-module SimpleDisk
+module SimpleDiskmod
 
 export SimpleDisk, intensity
 

@@ -30,8 +30,8 @@ using .Kerr: KerrBH
 using .KerrPFDM: KerrPFDMBH
 using .SchwarzschildNumerical: SchwarzschildNumBH, dr_inverse_metric
 using .ImagePlane: Detector
-using .ThinDisk: ThinDisk
-using .SimpleDisk: SimpleDisk
+using .ThinDiskmod: ThinDisk
+using .SimpleDiskmod: SimpleDisk
 using .Common: Image, create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift, plot
 
 export SchwarzschildBH, KerrBH, KerrPFDMBH, SchwarzschildNumBH, dr_inverse_metric
