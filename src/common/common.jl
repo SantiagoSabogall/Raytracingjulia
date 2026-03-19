@@ -5,6 +5,7 @@ using ..Raytracingjulia: metric, inverse_metric, Omega, geodesics
 
 
 using DifferentialEquations
+using StaticArrays
 using Base.Threads
 using Plots
 using JLD2
@@ -32,13 +33,13 @@ mutable struct Photon
     alpha::Float64
     beta::Float64
     freq::Float64
-    i::Union{Int, Nothing}
-    j::Union{Int, Nothing}
-    iC::Union{Vector{Float64}, Nothing}
-    fP::Union{Vector{Float64}, Nothing}
+    i::Int
+    j::Int
+    iC::SVector{8, Float64} # Cambiado a SVector para estabilidad
+    fP::SVector{8, Float64}
 
     function Photon(alpha::Float64, beta::Float64, freq::Float64=1.0)
-        new(alpha, beta, freq, nothing, nothing, nothing, nothing)
+        new(alpha, beta, freq, 0, 0, zeros(SVector{8}), zeros(SVector{8}))
     end
 end
 
@@ -47,42 +48,46 @@ end
 # ============================================================
 
 function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
+    # Rango máximo de integración
+    tspan = (0.0, -1.5 * detector.D)
 
-    final_λ = 1.5 * detector.D
-    lmbda_range = range(0.0, -final_λ, length=Int(7 * final_λ))
-    tspan = (lmbda_range[1], lmbda_range[end])
-
-    prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-    sol = solve(prob, Tsit5(), 
-                reltol=1e-8, 
-                abstol=1e-8, 
-                verbose=false,
-                saveat=lmbda_range)
-                    
-
-
-    p.fP = zeros(8)
-    I_f = 0.0
-
-    zi  = [cos(u[3]) for u in sol.u]
-    zi1 = circshift(zi, -1)
-    zi1[end] = 0.0
-
-    indxs = findall(zi .* zi1 .< 0)
-
-    for idx in indxs
-        u = sol.u[idx]
-        r = u[2]
-
+    # 1. CALLBACK PARA EL DISCO: Detecta cos(theta) = 0
+    # Guardamos el resultado en una variable local capturada por el affect!
+    hit_intensity = 0.0
+    
+    # Condición: cruce por el plano ecuatorial
+    disc_cond(u, t, integrator) = cos(u[3])
+    
+    function disc_affect!(integrator)
+        r = integrator.u[2]
         if acc_structure.in_edge < r < acc_structure.out_edge
-            p.fP = u
+            # Si golpea el disco, calculamos Doppler y terminamos
             I0 = acc_structure.intensity(r)
-            I_f = doppler_shift(p, I0, blackhole)
-            break
+            # Pasamos integrator.u directamente (es un SVector)
+            hit_intensity = doppler_shift_fast(integrator.u, I0, blackhole)
+            terminate!(integrator)
         end
     end
 
-    return I_f
+    # 2. CALLBACK PARA EL HORIZONTE: Evita entrar al agujero
+    horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
+    horizon_affect!(integrator) = terminate!(integrator)
+
+    cb = CallbackSet(
+        ContinuousCallback(disc_cond, disc_affect!),
+        ContinuousCallback(horizon_cond, horizon_affect!)
+    )
+
+    # 3. SOLVER: save_everystep=false es la clave de la velocidad
+    prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
+    sol = solve(prob, Tsit5(), 
+                callback=cb, 
+                reltol=1e-8, 
+                abstol=1e-8, 
+                save_everystep=false, 
+                verbose=false)
+
+    return hit_intensity
 end
 
 function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, detector)
@@ -151,25 +156,18 @@ end
 # Physics
 # ============================================================
 
-function doppler_shift(p::Photon, I0::Float64, blackhole)
-
-    if p.fP === nothing || all(p.fP .== 0.0)
-        return 0.0
-    end
-
-    coords = p.fP[1:4]
+function doppler_shift_fast(u_final, I0::Float64, blackhole)
+    coords = @SVector [u_final[1], u_final[2], u_final[3], u_final[4]]
     g_tt, _, _, g_phph, g_tph = metric(blackhole, coords)
 
-    Ω = Omega(blackhole, p.fP[2])
-    if !isfinite(Ω)
-        return 0.0
-    end
+    Ω = Omega(blackhole, u_final[2])
+    !isfinite(Ω) && return 0.0
 
-    k_t   = p.fP[5]
-    k_phi = p.fP[8]
+    k_t   = u_final[5]
+    k_phi = u_final[8]
 
-    g = sqrt(-g_tt - 2g_tph*Ω - g_phph*Ω^2) /
-        (1 + k_phi*Ω / k_t)
+    # Factor redshift corregido
+    g = sqrt(abs(-g_tt - 2g_tph*Ω - g_phph*Ω^2)) / (1 + k_phi*Ω / k_t)
 
     return I0 * g^3
 end
@@ -279,26 +277,24 @@ function create_photons!(img::Image)
 end
 
 function create_image!(img::Image)
-
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
-
+    n_photons = length(img.photon_list)
+    
     println("Integrating trajectories with ", nthreads(), " threads...")
     t0 = time()
 
-    @threads for k in eachindex(img.photon_list)
+    # Usamos un contador atómico para el progreso si quieres, 
+    # pero @threads es lo principal aquí.
+    @threads for k in 1:n_photons
         p = img.photon_list[k]
-        img.image_data[p.i, p.j] =
-            geodesics_integrate(p, img.blackhole, img.acc_structure, img.detector)
-
-        print("\rPhoton # $photon")
-        flush(stdout)
-
-        photon += 1
+        # Ejecución directa
+        intensity = geodesics_integrate(p, img.blackhole, img.acc_structure, img.detector)
+        img.image_data[p.i, p.j] = intensity
     end
 
-    println("Total time: ", round(time() - t0, digits=2), " s")
-    println(
-        "\n--- Time of integration : $(total_time / length(img.photon_list)) seconds/photon ---\n")
+    total_time = time() - t0
+    println("\nTotal time: ", round(total_time, digits=2), " s")
+    println("Efficiency: ", total_time / n_photons, " s/photon")
 end
 function create_image_no_Doppler!(img::Image)
 

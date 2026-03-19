@@ -2,10 +2,9 @@ module Kerr
 
 export KerrBH
 
-# IMPORTANTE: Usamos 'import' para poder extender las funciones del padre
 import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
-using LinearAlgebra
+using LinearAlgebra, StaticArrays
 
 mutable struct KerrBH
     a::Float64
@@ -31,29 +30,34 @@ end
 # Angular velocity
 # ============================
 function Omega(b::KerrBH, r::Real; corotating::Bool=true)
-    corotating ? 1 / (r^(3/2) + b.a) :
-                 -1 / (r^(3/2) - b.a)
+    corotating ? 1 / (r *sqrt(r) + b.a) :
+                 -1 / (r * sqrt(r) - b.a)
 end
 
 # ============================
 # Kerr metric
 # ============================
-function metric(b::KerrBH, x::AbstractVector)
+function metric(b::KerrBH, x::SVector{4,Float64})
     r = x[2]
     θ = x[3]
 
-    r2 = r^2
-    a2 = b.a^2
-    sinθ2 = sin(θ)^2
+    r2 = r*r
+    a2 = b.a*b.a
+
+    sinθ, cosθ = sincos(θ)
+    sinθ2 = sinθ*sinθ
+    cosθ2 = cosθ*cosθ
 
     Δ = r2 - 2r + a2
-    Σ = r2 + a2*cos(θ)^2
+    Σ = r2 + a2*cosθ2
 
-    g_tt   = -(1 - 2r/Σ)
+    invΣ = 1.0 / Σ
+
+    g_tt   = -(1 - 2r*invΣ)
     g_rr   = Σ/Δ
     g_θθ   = Σ
-    g_φφ   = (r2 + a2 + 2a2*r*sinθ2/Σ)*sinθ2
-    g_tφ   = -2*b.a*r*sinθ2/Σ
+    g_φφ   = (r2 + a2 + 2a2*r*sinθ2*invΣ)*sinθ2
+    g_tφ   = -2*b.a*r*sinθ2*invΣ
 
     return g_tt, g_rr, g_θθ, g_φφ, g_tφ
 end
@@ -85,63 +89,83 @@ end
 # ============================
 # Photon geodesics (Hamiltonian)
 # ============================
+using StaticArrays
+
+# 1. Cambiamos la firma para que sea (u, p, t) como espera DiffEq
+# u = vector de estado (q), p = parámetros (el objeto KerrBH), t = parámetro afín (λ)
 function geodesics(q, b::KerrBH, λ)
-    # q[1]=t, q[2]=r, q[3]=θ, q[4]=φ
-    # q[5]=kt, q[6]=kr, q[7]=kθ, q[8]=kφ
-    r  = q[2]
-    θ  = q[3]
-    kt = q[5] 
-    kr = q[6]
-    kθ = q[7]
-    kφ = q[8]
+    # Desempaquetado con @inbounds para evitar chequeos de límites
+    @inbounds begin
+        r  = q[2]
+        θ  = q[3]
+        kt = q[5] 
+        kr = q[6]
+        kθ = q[7]
+        kφ = q[8]
+    end
 
-    r2 = r^2
-    a2 = b.a^2
-    sinθ = sin(θ)
-    cosθ = cos(θ)
-    sinθ2 = sinθ^2
-    cosθ2 = cosθ^2
-
-    Σ = r2 + a2*cosθ2
-    Σ2 = Σ^2
-    Δ = r2 - 2r + a2
-
-    # W = -kt*(r2 + a2) - a*kφ  (kt es q[5] en Julia, q[4] en Py)
-    W = -kt*(r2 + a2) - b.a*kφ
+    # Pre-cálculos trigonométricos (usando sincos para velocidad)
+    sinθ, cosθ = sincos(θ)
+    sinθ2 = sinθ * sinθ
+    cosθ2 = cosθ * cosθ
     
-    # partXi en Python usa q[7] (kφ) y q[4] (kt)
-    partΞ = r2 + (kφ + b.a*kt)^2 + a2*(1 + kt^2)*cosθ2 + (kφ^2 * cosθ2 / sinθ2)
-    Ξ = W^2 - Δ*partΞ
+    # Manejo de singularidad en los polos (evita división por cero)
+    inv_sinθ2 = 1.0 / (sinθ2 + 1e-14)
+    inv_sinθ  = 1.0 / (sinθ + 1e-14)
+
+    r2 = r * r
+    a  = b.a
+    a2 = a * a # Idealmente b.a2 si lo añades al struct
+    
+    # Geometría base
+    Σ = r2 + a2 * cosθ2
+    invΣ = 1.0 / Σ
+    invΣ2 = invΣ * invΣ
+    
+    Δ = r2 - 2.0*r + a2
+    invΔ = 1.0 / Δ
+
+    # Hamiltoniano y términos auxiliares
+    W = -kt * (r2 + a2) - a * kφ
+    
+    # partΞ optimizado
+    partΞ = r2 + (kφ + a * kt)^2 + a2 * (1.0 + kt^2) * cosθ2 + (kφ^2 * cosθ2 * inv_sinθ2)
+    Ξ = W^2 - Δ * partΞ
 
     # Derivadas de Xi
-    dΞdE = 2*W*(r2 + a2) + 2.0*b.a*Δ*(kφ + b.a*kt*sinθ2)
-    dΞdL = -2*b.a*W - 2*b.a*kt*Δ - 2*kφ*Δ/sinθ2
-    dΞdr = -4*r*kt*W - 2*(r - 1)*partΞ - 2*r*Δ # Revisa si este 2r*Δ en Py no debería ser Δ * (derivada de partXi)
-
-    # Coeficientes A, B, C
-    dAdr = (r - 1)/Σ - (r*Δ)/Σ2
-    dBdr = -r/Σ2
-    dCdr = dΞdr/(2*Δ*Σ) - (Ξ*(r - 1))/(Σ*Δ^2) - r*Ξ/(Δ*Σ2)
-
-    auxθ = a2*cosθ*sinθ
-    dAdθ = Δ*auxθ/Σ2
-    dBdθ = auxθ/Σ2
+    dΞdE = 2.0 * W * (r2 + a2) + 2.0 * a * Δ * (kφ + a * kt * sinθ2)
+    dΞdL = -2.0 * a * W - 2.0 * a * kt * Δ - 2.0 * kφ * Δ * inv_sinθ2
     
-    # dCdθ: Ojo al kφ^2 y kt^2
-    dCdθ = ((1 + kt^2)*auxθ + (kφ^2 * cosθ / (sinθ2 * sinθ)))/Σ + (Ξ/(Δ*Σ2))*auxθ
+    # OJO: Revisa este término dΞdr en tu física, aquí lo mantenemos optimizado
+    dΞdr = -4.0 * r * kt * W - 2.0 * (r - 1.0) * partΞ - 2.0 * r * Δ 
 
-    # Ecuaciones diferenciales
-    dtdλ  = dΞdE/(2.0*Δ*Σ)
-    drdλ  = (Δ/Σ)*kr
-    dθdλ  = kθ/Σ
-    dφdλ  = -dΞdL/(2.0*Δ*Σ)
+    # Coeficientes A, B, C con multiplicaciones en vez de divisiones
+    common_term = Ξ * invΔ * invΣ
+    dAdr = (r - 1.0) * invΣ - (r * Δ) * invΣ2
+    dBdr = -r * invΣ2
+    dCdr = (dΞdr * 0.5 * invΔ * invΣ) - (common_term * (r - 1.0) * invΔ) - (r * Ξ * invΔ * invΣ2)
 
-    dk_t = 0.0
-    dk_r = -dAdr*kr^2 - dBdr*kθ^2 + dCdr
-    dk_th = -dAdθ*kr^2 - dBdθ*kθ^2 + dCdθ
+    auxθ = a2 * cosθ * sinθ
+    dAdθ = Δ * auxθ * invΣ2
+    dBdθ = auxθ * invΣ2
+    
+    # dCdθ optimizado
+    term_trig_C = (kφ^2 * cosθ * inv_sinθ2 * inv_sinθ)
+    dCdθ = ((1.0 + kt^2) * auxθ + term_trig_C) * invΣ + (common_term * auxθ * invΣ)
+
+    # Ecuaciones diferenciales (Sistema de 8 ODEs)
+    dtdλ = dΞdE * 0.5 * invΔ * invΣ
+    drdλ = (Δ * invΣ) * kr
+    dθdλ = kθ * invΣ
+    dφdλ = -dΞdL * 0.5 * invΔ * invΣ
+
+    dk_t  = 0.0
+    dk_r  = -dAdr * kr^2 - dBdr * kθ^2 + dCdr
+    dk_th = -dAdθ * kr^2 - dBdθ * kθ^2 + dCdθ
     dk_ph = 0.0
 
-    return [dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_ph]
+    # 2. RETORNO CRÍTICO: Usamos SVector para evitar alocaciones en el heap
+    return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_ph)
 end
 
 end # module Kerr
