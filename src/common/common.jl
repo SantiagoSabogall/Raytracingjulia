@@ -49,6 +49,7 @@ end
 
 function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
     # Rango máximo de integración
+    r_max = 1.2 * detector.D
     tspan = (0.0, -1.5 * detector.D)
 
     # 1. CALLBACK PARA EL DISCO: Detecta cos(theta) = 0
@@ -64,7 +65,7 @@ function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
             # Si golpea el disco, calculamos Doppler y terminamos
             I0 = acc_structure.intensity(r)
             # Pasamos integrator.u directamente (es un SVector)
-            hit_intensity = doppler_shift_fast(integrator.u, I0, blackhole)
+            hit_intensity = doppler_shift(integrator.u, I0, blackhole)
             terminate!(integrator)
         end
     end
@@ -72,20 +73,28 @@ function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
     # 2. CALLBACK PARA EL HORIZONTE: Evita entrar al agujero
     horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
     horizon_affect!(integrator) = terminate!(integrator)
+    escape_cond(u, t, integrator) = u[2] - r_max
+    escape_affect!(integrator) = terminate!(integrator)
 
     cb = CallbackSet(
         ContinuousCallback(disc_cond, disc_affect!),
-        ContinuousCallback(horizon_cond, horizon_affect!)
+        ContinuousCallback(horizon_cond, horizon_affect!),
+        ContinuousCallback(escape_cond, escape_affect!)
     )
 
     # 3. SOLVER: save_everystep=false es la clave de la velocidad
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-    sol = solve(prob, Tsit5(), 
-                callback=cb, 
-                reltol=1e-8, 
-                abstol=1e-8, 
-                save_everystep=false, 
-                verbose=false)
+    
+    sol = solve(prob, Tsit5(); 
+        callback=cb, 
+        reltol=1e-6, 
+        abstol=1e-6, 
+        save_everystep=false,
+        unstable_check=false,
+        verbose=false
+    )
+
+
 
     return hit_intensity
 end
@@ -156,7 +165,7 @@ end
 # Physics
 # ============================================================
 
-function doppler_shift_fast(u_final, I0::Float64, blackhole)
+function doppler_shift(u_final, I0::Float64, blackhole)
     coords = @SVector [u_final[1], u_final[2], u_final[3], u_final[4]]
     g_tt, _, _, g_phph, g_tph = metric(blackhole, coords)
 
