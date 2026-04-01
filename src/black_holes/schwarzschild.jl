@@ -7,7 +7,9 @@ using StaticArrays
 
 export SchwarzschildBH
 
-mutable struct SchwarzschildBH
+# Inmutable: los parámetros no cambian tras la construcción.
+# Permite al compilador optimizar el acceso a campos sin boxing.
+struct SchwarzschildBH
     a::Float64
     EH::Float64
     ISCOco::Float64
@@ -18,42 +20,55 @@ mutable struct SchwarzschildBH
     end
 end
 
-# Ahora puedes definirlas sin errores de precompilación
-function Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
-    return 1.0 / r^1.5
+@inline function Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
+    return 1.0 / (r * sqrt(r))   # r^1.5 sin exponente flotante
 end
 
-function metric(b::SchwarzschildBH, x::AbstractVector)
-    r = x[2]; θ = x[3]
-    f = 1.0 - 2.0/r
-    return -f, 1.0/f, r^2, (r*sin(θ))^2, 0.0
+@inline function metric(b::SchwarzschildBH, x::AbstractVector)
+    r  = x[2]; θ = x[3]
+    f  = 1.0 - 2.0/r
+    sinθ = sin(θ)
+    r2   = r * r
+    return -f, 1.0/f, r2, r2 * sinθ * sinθ, 0.0
 end
 
-function inverse_metric(b::SchwarzschildBH, x::AbstractVector)
-    r = x[2]; θ = x[3]
-    f = 1.0 - 2.0/r
-    return -1.0/f, f, 1.0/r^2, 1.0/(r*sin(θ))^2, 0.0
+@inline function inverse_metric(b::SchwarzschildBH, x::AbstractVector)
+    r    = x[2]; θ = x[3]
+    f    = 1.0 - 2.0/r
+    sinθ = sin(θ)
+    r2   = r * r
+    return -1.0/f, f, 1.0/r2, 1.0/(r2 * sinθ * sinθ), 0.0
 end
 
-function geodesics(q, b::SchwarzschildBH, λ)
-    # q = [t, r, θ, φ, k_t, k_r, k_th, k_φ]
-    r = q[2]; θ = q[3]
-    k_t, k_r, k_th, k_φ = q[5:8]
-    f = 1.0 - 2.0/r
+# Out-of-place: retorna SVector para cero alocaciones en el heap
+@inline function geodesics(q, b::SchwarzschildBH, λ)
+    @inbounds begin
+        r    = q[2]
+        θ    = q[3]
+        k_t  = q[5]
+        k_r  = q[6]
+        k_th = q[7]
+        k_φ  = q[8]
+    end
 
-    # Coordenadas
+    sinθ, cosθ = sincos(θ)
+    f     = 1.0 - 2.0/r
+    r2    = r * r
+    sinθ2 = sinθ * sinθ
+    inv_r2    = 1.0 / r2
+    inv_rm2sq = 1.0 / ((r - 2.0) * (r - 2.0))
+
     dtdλ = -k_t / f
-    drdλ = f * k_r
-    dθdλ = k_th / r^2
-    dφdλ = k_φ / (r*sin(θ))^2
+    drdλ =  f * k_r
+    dθdλ =  k_th * inv_r2
+    dφdλ =  k_φ  * inv_r2 / sinθ2
 
-    # Momentos (Ecuaciones simplificadas para Schwarzschild)
-    dk_t = 0.0
-    dk_r = -(1.0/r^2)*dtdλ^2 + (1.0/(r-2.0)^2)*drdλ^2 + r*dθdλ^2 + r*sin(θ)^2*dφdλ^2
-    dk_th = sin(θ)*cos(θ)*dφdλ^2
-    dk_φ = 0.0
+    dk_t  = 0.0
+    dk_r  = -inv_r2 * dtdλ^2 + inv_rm2sq * drdλ^2 + r * dθdλ^2 + r * sinθ2 * dφdλ^2
+    dk_th = sinθ * cosθ * dφdλ^2
+    dk_φ  = 0.0
 
     return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_φ)
 end
 
-end
+end # module Schwarzschild

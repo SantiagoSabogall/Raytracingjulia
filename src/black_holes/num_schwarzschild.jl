@@ -2,6 +2,7 @@ module SchwarzschildNumerical
 
 using Dierckx
 using DelimitedFiles
+using StaticArrays
 
 export SchwarzschildNumBH, dr_inverse_metric
 
@@ -49,7 +50,7 @@ end
 # Métodos Extendidos
 # -------------------------
 
-function metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
+function metric(b::SchwarzschildNumBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
     Nr = b.N(r)
@@ -63,7 +64,7 @@ function metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
     return g_tt, g_rr, g_thth, g_phph, g_tph
 end
 
-function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
+function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
     Nr = b.N(r)
@@ -78,7 +79,7 @@ function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
 end
 
 # Función auxiliar (no necesita ser extendida si solo se usa aquí)
-function dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
+function dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
     Nr = b.N(r)
@@ -94,7 +95,7 @@ function dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector{<:Real})
 end
 
 # Firma corregida (q, b, lambda)
-function geodesics(q::AbstractVector{<:Real}, b::SchwarzschildNumBH, λ::Real)
+function geodesics(q, b::SchwarzschildNumBH, λ)
     g = inverse_metric(b, q)
     drg = dr_inverse_metric(b, q)
 
@@ -109,7 +110,7 @@ function geodesics(q::AbstractVector{<:Real}, b::SchwarzschildNumBH, λ::Real)
     dk_th  = (cos(q[3]) / sin(q[3])^3) * (q[8] / q[2])^2
     dk_ph  = 0.0
 
-    return [dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_ph]
+    return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_ph)
 end
 
 end # module

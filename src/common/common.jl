@@ -102,21 +102,19 @@ function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, det
                 verbose=false,
                 saveat=lmbda_range)
 
-    p.fP = zeros(8)
+    p.fP = @SVector zeros(8)
 
-    zi  = [cos(u[3]) for u in sol.u]
-    zi1 = circshift(zi, -1)
-    zi1[end] = zi[end]
-
-    indxs = findall(zi .* zi1 .< 0)
-
-    for idx in indxs
-        u = sol.u[idx]
-        r = u[2]
-
-        if acc_structure.in_edge < r < acc_structure.out_edge
-            p.fP = u
-            return acc_structure.intensity(r)
+    for i in 1:(length(sol.u) - 1)
+        z_curr = cos(sol.u[i][3])
+        z_next = cos(sol.u[i+1][3])
+        
+        if z_curr * z_next < 0
+            u = sol.u[i]
+            r = u[2]
+            if acc_structure.in_edge < r < acc_structure.out_edge
+                p.fP = u
+                return acc_structure.intensity(r)
+            end
         end
     end
 
@@ -184,33 +182,30 @@ function integrate_for_H(p::Photon, blackhole, acc_structure, detector)
                 saveat = lmbda_range)
 
 
-    solution = sol.u
     last_idx = length(sol.u)
 
+    for i in 1:(length(sol.u) - 1)
+        z_curr = cos(sol.u[i][3])
+        z_next = cos(sol.u[i+1][3])
+        
+        if z_curr * z_next < 0
+            r = sol.u[i][2]
+            if acc_structure.in_edge < r < acc_structure.out_edge
+                last_idx = i
+                break
+            end
+        end
+    end
 
-    zi = [cos(u[3]) for u in sol.u]
-    zi1 = circshift(zi, -1)
-    zi1[end] = zi[end] 
-
-    indxs = findall(zi .* zi1 .< 0)
-    for i in indxs
-        r = sol.u[i][2]
-        if acc_structure.in_edge < r < acc_structure.out_edge
+    for i in 1:last_idx
+        if sol.u[i][2] < (blackhole.EH + 0.05)
             last_idx = i
             break
         end
     end
 
-
-    rEH = [u[2] for u in sol.u]
-    idxEH = findfirst(r -> r < (blackhole.EH + 0.05), rEH)
-    
-    if !isnothing(idxEH) && idxEH < last_idx
-        last_idx = idxEH
-    end
-
-    final_solution = sol.u[1:last_idx]
-    final_lambdas = sol.t[1:last_idx]
+    final_solution = @view sol.u[1:last_idx]
+    final_lambdas = @view sol.t[1:last_idx]
 
 
     H = Hamiltonian(final_solution, blackhole)
@@ -220,21 +215,26 @@ end
 
 
 
-function Hamiltonian(sol::Vector{Vector{Float64}}, blackhole)
+function Hamiltonian(sol, blackhole)
 
     H = zeros(length(sol))
 
     for i in eachindex(sol)
-        x = sol[i][1:4]
-        p = sol[i][5:8]
+        u = sol[i]
+        
+        gtt, grr, gθθ, gφφ, gtφ = inverse_metric(blackhole, u)
+        
+        pt = u[5]
+        pr = u[6]
+        pth = u[7]
+        pph = u[8]
 
-        gtt, grr, gθθ, gφφ, gtφ = inverse_metric(blackhole, x)
-    H[i] = 0.5 * (
-        gtt * p[1]^2 +
-        grr * p[2]^2 +
-        gθθ * p[3]^2 +
-        gφφ * p[4]^2 +
-        2 * gtφ * p[1] * p[4]
+        H[i] = 0.5 * (
+            gtt * pt^2 +
+            grr * pr^2 +
+            gθθ * pth^2 +
+            gφφ * pph^2 +
+            2 * gtφ * pt * pph
         )  
     end
 

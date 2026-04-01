@@ -89,9 +89,8 @@ function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
     term_r = 1.0 - (k_th^2 / g_thth) - (k_ph^2 / g_phph)
     k_r = sqrt(g_rr * max(0.0, term_r))   # fotón entrante
 
-    k = @SVector [k_t, k_r, k_th, k_ph]
-
-    return [x; k]
+    # Devolvemos directamente un SVector{8} para cero alocaciones en el Heap
+    return SVector{8, Float64}(0.0, r, theta, phi, k_t, k_r, k_th, k_ph)
 end
 
 
