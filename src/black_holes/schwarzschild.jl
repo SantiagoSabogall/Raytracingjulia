@@ -3,6 +3,8 @@ module Schwarzschild
 # IMPORTANTE: Usamos 'import' para poder extender las funciones del padre
 import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
+using StaticArrays
+
 export SchwarzschildBH
 
 mutable struct SchwarzschildBH
@@ -21,19 +23,19 @@ function Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
     return 1.0 / r^1.5
 end
 
-function metric(b::SchwarzschildBH, x::Vector{<:Real})
+function metric(b::SchwarzschildBH, x::AbstractVector)
     r = x[2]; θ = x[3]
     f = 1.0 - 2.0/r
-    return [-f, 1.0/f, r^2, (r*sin(θ))^2, 0.0]
+    return -f, 1.0/f, r^2, (r*sin(θ))^2, 0.0
 end
 
-function inverse_metric(b::SchwarzschildBH, x::Vector{<:Real})
+function inverse_metric(b::SchwarzschildBH, x::AbstractVector)
     r = x[2]; θ = x[3]
     f = 1.0 - 2.0/r
-    return [-1.0/f, f, 1.0/r^2, 1.0/(r*sin(θ))^2, 0.0]
+    return -1.0/f, f, 1.0/r^2, 1.0/(r*sin(θ))^2, 0.0
 end
 
-function geodesics(q::Vector{<:Real}, b::SchwarzschildBH, λ::Real)
+function geodesics(q, b::SchwarzschildBH, λ)
     # q = [t, r, θ, φ, k_t, k_r, k_th, k_φ]
     r = q[2]; θ = q[3]
     k_t, k_r, k_th, k_φ = q[5:8]
@@ -51,7 +53,7 @@ function geodesics(q::Vector{<:Real}, b::SchwarzschildBH, λ::Real)
     dk_th = sin(θ)*cos(θ)*dφdλ^2
     dk_φ = 0.0
 
-    return [dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_φ]
+    return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_φ)
 end
 
 end

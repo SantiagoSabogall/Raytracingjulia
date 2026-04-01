@@ -7,6 +7,7 @@ import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
 using LinearAlgebra
 using Roots
+using StaticArrays
 
 # ============================================================
 # Kerr–PFDM Black Hole struct 
@@ -169,7 +170,7 @@ function geodesics(q, b::KerrPFDMBH, λ)
     dk_θ  = -dAdθ*kr^2 - dBdθ*kθ^2 + dCdθ
     dk_φ  = 0.0
 
-    return [dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_θ, dk_φ]
+    return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_θ, dk_φ)
 end
 
 end # module KerrPFDM

@@ -46,33 +46,27 @@ end
 # ============================================================
 # Geodesic integrators
 # ============================================================
-
 function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
-    # Rango máximo de integración
+
     r_max = 1.2 * detector.D
     tspan = (0.0, -1.5 * detector.D)
 
-    # 1. CALLBACK PARA EL DISCO: Detecta cos(theta) = 0
-    # Guardamos el resultado en una variable local capturada por el affect!
-    hit_intensity = 0.0
-    
-    # Condición: cruce por el plano ecuatorial
+    hit_intensity = Ref(0.0)   # 🔥 FIX
+
     disc_cond(u, t, integrator) = cos(u[3])
     
     function disc_affect!(integrator)
         r = integrator.u[2]
         if acc_structure.in_edge < r < acc_structure.out_edge
-            # Si golpea el disco, calculamos Doppler y terminamos
             I0 = acc_structure.intensity(r)
-            # Pasamos integrator.u directamente (es un SVector)
-            hit_intensity = doppler_shift(integrator.u, I0, blackhole)
+            hit_intensity[] = doppler_shift(integrator.u, I0, blackhole)  # 🔥 FIX
             terminate!(integrator)
         end
     end
 
-    # 2. CALLBACK PARA EL HORIZONTE: Evita entrar al agujero
     horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
     horizon_affect!(integrator) = terminate!(integrator)
+
     escape_cond(u, t, integrator) = u[2] - r_max
     escape_affect!(integrator) = terminate!(integrator)
 
@@ -82,21 +76,17 @@ function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
         ContinuousCallback(escape_cond, escape_affect!)
     )
 
-    # 3. SOLVER: save_everystep=false es la clave de la velocidad
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-    
+
     sol = solve(prob, Tsit5(); 
         callback=cb, 
         reltol=1e-6, 
         abstol=1e-6, 
         save_everystep=false,
-        unstable_check=false,
         verbose=false
     )
 
-
-
-    return hit_intensity
+    return hit_intensity[]   # 🔥 FIX
 end
 
 function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, detector)
@@ -218,7 +208,7 @@ function integrate_for_H(p::Photon, blackhole, acc_structure, detector)
     if !isnothing(idxEH) && idxEH < last_idx
         last_idx = idxEH
     end
-ída
+
     final_solution = sol.u[1:last_idx]
     final_lambdas = sol.t[1:last_idx]
 
@@ -292,26 +282,32 @@ function create_image!(img::Image)
     println("Integrating trajectories with ", nthreads(), " threads...")
     t0 = time()
 
-    # Usamos un contador atómico para el progreso si quieres, 
-    # pero @threads es lo principal aquí.
+    counter = Atomic{Int}(0)
+    
     @threads for k in 1:n_photons
         p = img.photon_list[k]
-        # Ejecución directa
         intensity = geodesics_integrate(p, img.blackhole, img.acc_structure, img.detector)
         img.image_data[p.i, p.j] = intensity
+        
+        c = atomic_add!(counter, 1) + 1
+        if c % 100 == 0 || c == n_photons
+            print("\rPhoton # $c / $n_photons")
+            flush(stdout)
+        end
     end
 
     total_time = time() - t0
-    println("\nTotal time: ", round(total_time, digits=2), " s")
+    println("\n\nTotal time: ", round(total_time, digits=2), " s")
     println("Efficiency: ", total_time / n_photons, " s/photon")
 end
 function create_image_no_Doppler!(img::Image)
 
    
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
+    n_photons = length(img.photon_list)
 
     photon = 1
-    println("Integrating trajectories with", nthreads(), "threads...")
+    println("Integrating trajectories (No Doppler)...")
 
     start_time = time()
 
@@ -319,7 +315,7 @@ function create_image_no_Doppler!(img::Image)
         img.image_data[p.i, p.j] =
             geodesics_integrate_no_Doppler(p, img.blackhole, img.acc_structure, img.detector)
 
-        print("\rPhoton # $photon")
+        print("\rPhoton # $photon / $n_photons")
         flush(stdout)
 
         photon += 1
@@ -329,7 +325,7 @@ function create_image_no_Doppler!(img::Image)
 
     println("\n\n--- Total time of integration : $total_time seconds ---")
     println(
-        "\n--- Time of integration : $(total_time / length(img.photon_list)) seconds/photon ---\n"
+        "\n--- Time of integration : $(total_time / n_photons) seconds/photon ---\n"
     )
 end
 
@@ -343,10 +339,17 @@ function create_shadow!(img::Image)
 
     start_time = time()
 
+    counter = Atomic{Int}(0)
     
     @threads for p in img.photon_list
         
         img.image_data[p.i, p.j] = shadow_integ(p, img.blackhole, img.detector)
+        
+        c = atomic_add!(counter, 1) + 1
+        if c % 100 == 0 || c == n_photons
+            print("\rPhoton # $c / $n_photons")
+            flush(stdout)
+        end
     end
 
     total_time = time() - start_time
