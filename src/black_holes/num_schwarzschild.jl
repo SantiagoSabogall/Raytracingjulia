@@ -1,3 +1,9 @@
+"""
+    SchwarzschildNumerical
+
+Provides a numerical framework for Schwarzschild spacetime where the lapse function \$N(r)\$
+is interpolated from external data constraints.
+"""
 module SchwarzschildNumerical
 
 using Dierckx
@@ -10,6 +16,12 @@ import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
 
 
+"""
+    SchwarzschildNumBH(path_N::String, path_dN::String)
+
+A dynamically loadable numerical Schwarzschild black hole. 
+Constructs cubic splines from text files corresponding to \$N(r)\$ and \$\\frac{dN}{dr}\$.
+"""
 mutable struct SchwarzschildNumBH
     rN::Vector{Float64}
     Nvals::Vector{Float64}
@@ -36,20 +48,34 @@ mutable struct SchwarzschildNumBH
         N = Spline1D(rN, Nvals)
         dNdr = Spline1D(rdN, dNvals)
 
-        # EH y ISCO por defecto para Schwarzschild (pueden ajustarse según los datos)
+        # Default Event Horizon and ISCO values for Schwarzschild (configurable depending on numerical constraints)
         new(rN, Nvals, N, rdN, dNvals, dNdr, 0.0, 2.0, 6.0, 6.0)
     end
 end
 
+"""
+    Omega(b::SchwarzschildNumBH, r::Real; corotating::Bool=true)
+
+Calculates the Keplerian angular velocity for a numerically defined metric:
+\$\\Omega_K = \\frac{1}{r^{3/2}}\$ (assuming mass \$M=1\$ is implicit in the numerical tables).
+"""
 function Omega(b::SchwarzschildNumBH, r::Real; corotating::Bool=true)
     return 1 / r^(3/2)
 end
 
 
-# -------------------------
-# Métodos Extendidos
-# -------------------------
+# ==============================================================================
+# Extended Methods
+# ==============================================================================
 
+"""
+    metric(b::SchwarzschildNumBH, x::AbstractVector)
+
+Evaluates the numerically interpolated Schwarzschild metric:
+\$ds^2 = -N(r) dt^2 + \\frac{1}{N(r)} dr^2 + r^2 d\\theta^2 + r^2 \\sin^2\\theta d\\phi^2\$
+
+Returns `(g_tt, g_rr, g_thth, g_phph, g_tph)`.
+"""
 function metric(b::SchwarzschildNumBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
@@ -64,6 +90,11 @@ function metric(b::SchwarzschildNumBH, x::AbstractVector)
     return g_tt, g_rr, g_thth, g_phph, g_tph
 end
 
+"""
+    inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
+
+Evaluates the contravariant components of the numerically interpolated metric.
+"""
 function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
@@ -78,7 +109,13 @@ function inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
     return gtt, grr, gthth, gphph, gtph
 end
 
-# Función auxiliar (no necesita ser extendida si solo se usa aquí)
+# Auxiliary Function (Local to the numerical module computations)
+"""
+    dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
+
+Calculates the radial derivative of the contravariant metric components, \$\\partial_r g^{\\mu\\nu}\$, 
+using the interpolated derivative \$\\frac{dN}{dr}\$.
+"""
 function dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
@@ -94,7 +131,15 @@ function dr_inverse_metric(b::SchwarzschildNumBH, x::AbstractVector)
     return drgtt, drgrr, drgthth, drgphph, drgtph
 end
 
-# Firma corregida (q, b, lambda)
+# Corrected signature mapped to (q, b, lambda)
+"""
+    geodesics(q, b::SchwarzschildNumBH, λ)
+
+Evaluates the right-hand side of the 8-ODE system for null geodesics.
+
+Derived using the fully numeric Hamiltonian formulation:
+\$\\dot{p}_\\alpha = -\\frac{1}{2} (\\partial_\\alpha g^{\\mu\\nu}) p_\\mu p_\\nu\$
+"""
 function geodesics(q, b::SchwarzschildNumBH, λ)
     g = inverse_metric(b, q)
     drg = dr_inverse_metric(b, q)

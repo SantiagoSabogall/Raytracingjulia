@@ -8,7 +8,7 @@ using LinearAlgebra
 using NPZ
 
 # ----------------------------
-# Configuración del agujero negro
+# Black Hole Configuration
 # ----------------------------
 a = 0.5
 blackhole = KerrBH(a)
@@ -35,7 +35,7 @@ detector = Detector(
 acc_structure = ThinDisk.ThinDisk(blackhole)
 
 # ----------------------------
-# Imagen
+# Image Processing
 # ----------------------------
 image = Image(blackhole, acc_structure, detector)
 
@@ -47,5 +47,5 @@ create_image_no_Doppler!(image)
 
 filename = "Kerr_a_0.5_1000_no_doppler.png"
 
-println("Mostrando imagen de prueba...")
+println("Rendering test image...")
 plot(image, save=true, filename=filename)

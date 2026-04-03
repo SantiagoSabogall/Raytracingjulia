@@ -1,3 +1,9 @@
+"""
+    ImagePlane
+
+Defines the observer's screen (detector) setup and the local mapping 
+of pixel coordinates to 4-momentum using Bardeen's impact parameters.
+"""
 module ImagePlane
 
 using StaticArrays
@@ -10,6 +16,22 @@ export Detector, photon_coords
 # Detector (pantalla del observador)
 # ============================================================
 
+# ============================================================
+# Detector (pantalla del observador)
+# ============================================================
+
+"""
+    Detector
+
+Defines the properties of the observational camera.
+
+# Fields
+- `D`: Distance from the black hole to the observer.
+- `iota` (\$\\iota\$): Inclination angle of the observer with respect to the black hole's spin axis.
+- `sin_iota` / `cos_iota`: Pre-computed trigonometrics.
+- `x_pixels` / `y_pixels`: Resolution dimensions.
+- `alphaRange` / `betaRange`: Range of pixel impact parameters \$(\\alpha, \\beta)\$.
+"""
 mutable struct Detector
     D::Float64
     iota::Float64
@@ -23,7 +45,7 @@ mutable struct Detector
     function Detector(D::Float64, iota::Float64, x_side::Float64;
                       x_pixels::Int=25, ratio::String="16:9")
 
-        # Forzar número par de píxeles
+        # Enforce even scaling for pixel spatial resolution
         actual_x_pixels = isodd(x_pixels) ? x_pixels + 1 : x_pixels
 
         if ratio == "16:9"
@@ -60,10 +82,24 @@ end
 # Condiciones iniciales del fotón
 # ============================================================
 
+# ============================================================
+# Condiciones iniciales del fotón
+# ============================================================
+
+"""
+    photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64; freq::Float64=1.0)
+
+Calculates the initial 4-position \$x^\\mu = (0, r, \\theta, \\phi)\$ and null 
+4-momentum \$k_\\mu = (k_t, k_r, k_\\theta, k_\\phi)\$ for a photon arriving at the 
+detector pixel \$(\\alpha, \\beta)\$.
+
+Derived from Bardeen's equations using the observer's local tetrad.
+Returns an `SVector{8, Float64}`.
+"""
 function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
                        freq::Float64=1.0)
 
-    # Posición inicial (pantalla → BL)
+    # Initial spatial projection bounds (Screen → Boyer-Lindquist formulation)
     r = sqrt(alpha*alpha + beta*beta + d.D*d.D)
 
     arg = (beta * d.sin_iota + d.D * d.cos_iota) / r
@@ -74,22 +110,22 @@ function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
 
     x = @SVector [0.0, r, theta, phi]
 
-    # Métrica
+    # Metric covariant array assignments
     g_tt, g_rr, g_thth, g_phph, g_tph = metric(blackhole, x)
 
-    # Componentes espaciales del momento
+    # Spatial null momentum boundary variables
     invD = 1.0 / d.D
     k_th = sqrt(g_thth) * beta * invD
     k_ph = -sqrt(g_phph) * alpha * invD
 
-    # Energía (normalización nula)
+    # Energy bounds mapping constrained to null geodesic normalization
     k_t = -freq * sqrt(g_phph / (g_tph^2 - g_tt * g_phph)) +
           alpha * g_tph * invD / sqrt(g_phph)
 
     term_r = 1.0 - (k_th^2 / g_thth) - (k_ph^2 / g_phph)
-    k_r = sqrt(g_rr * max(0.0, term_r))   # fotón entrante
+    k_r = sqrt(g_rr * max(0.0, term_r))   # Inbound trajectory geometry constraints
 
-    # Devolvemos directamente un SVector{8} para cero alocaciones en el Heap
+    # Returned via direct SVector{8} structural typing bypassing dynamic heap allocations
     return SVector{8, Float64}(0.0, r, theta, phi, k_t, k_r, k_th, k_ph)
 end
 

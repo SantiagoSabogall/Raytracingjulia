@@ -1,3 +1,8 @@
+"""
+    ThinDiskmod
+
+Implements the Novikov-Thorne geometrically thin, optically thick accretion disk model.
+"""
 module ThinDiskmod
 
 export ThinDisk, intensity,f
@@ -8,6 +13,22 @@ using Interpolations: interpolate, Gridded, Linear
 # Thin disk structure
 # ============================
 # ============================
+# ============================
+# Thin disk structure
+# ============================
+"""
+    ThinDisk
+
+Structure representing a Novikov-Thorne accretion disk.
+
+# Fields
+- `in_edge`: Inner edge radius (typically ISCO).
+- `out_edge`: Outer edge radius.
+- `a`: Black hole spin.
+- `ISCO`: Innermost Stable Circular Orbit.
+- `energy_profile`: Interpolated function for the radial emission profile.
+- `intensity`: Final radiative intensity function \$I(r)\$.
+"""
 mutable struct ThinDisk
     in_edge::Float64
     out_edge::Float64
@@ -59,6 +80,15 @@ end
 # ============================
 # Novikov–Thorne flux
 # ============================
+# ============================
+# Novikov–Thorne flux
+# ============================
+"""
+    f(d::ThinDisk, r::Real)
+
+Calculates the Novikov-Thorne radiative flux \$\\mathcal{F}(r)\$ for a 
+geometrically thin accretion disk according to Page & Thorne (1974).
+"""
 function f(d::ThinDisk, r::Real)
     a = d.a
     arccos_a = acos(a)

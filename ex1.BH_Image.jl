@@ -7,7 +7,6 @@ using Raytracingjulia
 using LinearAlgebra
 using NPZ
 
-# ----------------------------
 # Configuración del agujero negro
 # ----------------------------
 a = 0.5

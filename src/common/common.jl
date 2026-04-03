@@ -1,3 +1,9 @@
+"""
+    Common
+
+Provides the core integration loop for non-symplectic `Tsit5` ordinary differential 
+equation evaluation, observational logic (Doppler shifts, shadowing), and plotting handlers.
+"""
 module Common
 
 using ..ImagePlane: photon_coords
@@ -29,13 +35,30 @@ export Photon, Image,
 # Photon
 # ============================================================
 
+# ============================================================
+# Photon
+# ============================================================
+
+"""
+    Photon
+
+Mutable container for a bundle of rays. Pre-allocated to prevent heap allocation 
+inside the ODE solvers.
+
+# Fields
+- `alpha`, `beta`: Impact parameters.
+- `freq`: Observed frequency.
+- `i`, `j`: Screen pixel indices.
+- `iC`: Initial state 8-vector (coordinate and momentum variables).
+- `fP`: Final hit-point state on the accretion structure.
+"""
 mutable struct Photon
     alpha::Float64
     beta::Float64
     freq::Float64
     i::Int
     j::Int
-    iC::SVector{8, Float64} # Cambiado a SVector para estabilidad
+    iC::SVector{8, Float64} # Strictly typed to SVector guaranteeing structural execution stability
     fP::SVector{8, Float64}
 
     function Photon(alpha::Float64, beta::Float64, freq::Float64=1.0)
@@ -46,6 +69,18 @@ end
 # ============================================================
 # Geodesic integrators
 # ============================================================
+# ============================================================
+# Geodesic integrators
+# ============================================================
+"""
+    geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
+
+Integrates the null geodesics via `DifferentialEquations.jl` using a `Tsit5` solver.
+Uses `ContinuousCallback` to accurately detect collisions with the accretion disk or 
+the event horizon.
+
+Returns the observed radiative intensity scaled by the Doppler factor \$g^3\$.
+"""
 function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
 
     r_max = 1.2 * detector.D
@@ -153,6 +188,19 @@ end
 # Physics
 # ============================================================
 
+# ============================================================
+# Physics
+# ============================================================
+
+"""
+    doppler_shift(u_final, I0::Float64, blackhole)
+
+Calculates the kinetic shift of the photon frequency:
+\$g = \\frac{\\nu_{obs}}{\\nu_{em}} = \\frac{\\left(k_\\mu u^\\mu\\right)_{obs}}{\\left(k_\\nu u^\\nu\\right)_{em}}\$
+Assuming the rest frame of the emitting particle rotates with Keplerian angular velocity \$\\Omega\$.
+
+Returns the invariant Doppler-shifted intensity \$I_{obs} = I_0 g^3\$.
+"""
 function doppler_shift(u_final, I0::Float64, blackhole)
     coords = @SVector [u_final[1], u_final[2], u_final[3], u_final[4]]
     g_tt, _, _, g_phph, g_tph = metric(blackhole, coords)
@@ -163,7 +211,7 @@ function doppler_shift(u_final, I0::Float64, blackhole)
     k_t   = u_final[5]
     k_phi = u_final[8]
 
-    # Factor redshift corregido
+    # Doppler invariant redshift ratio assignment
     g = sqrt(abs(-g_tt - 2g_tph*Ω - g_phph*Ω^2)) / (1 + k_phi*Ω / k_t)
 
     return I0 * g^3
@@ -215,6 +263,12 @@ end
 
 
 
+"""
+    Hamiltonian(sol, blackhole)
+
+Evaluates the Hamiltonian \$\\mathcal{H} = \\frac{1}{2} p_\\mu p^\\mu\$ along a geodesic trajectory.
+This serves as a numerical verification constraint: analytic null geodesics require \$\\mathcal{H} \\approx 0\$.
+"""
 function Hamiltonian(sol, blackhole)
 
     H = zeros(length(sol))
@@ -365,7 +419,7 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
     maxv = maximum(img.image_data)
     data = maxv > 0 ? img.image_data ./ maxv : img.image_data
 
-    # 2. Crear el heatmap
+    # 2. Render resulting observable spatial heatmap
     plt = heatmap(
         transpose(data),
         aspect_ratio = 1,
@@ -380,7 +434,7 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
         mkpath("images")
        
         Plots.savefig(plt, "images/$filename.png")
-        println("Imagen guardada en: images/$filename.png")
+        println("Rendering saved to: images/$filename.png")
     end
 
     display(plt)
@@ -418,7 +472,7 @@ function plot_shadow(img; save=false, filename=nothing, cmap=:gray)
 
         full_path = endswith(filename, ".png") ? "images/$filename" : "images/$filename.png"
         Plots.savefig(plt, full_path)
-        println("Sombra guardada en: $full_path")
+        println("Shadow mapped rendering to: $full_path")
     end
 
     display(plt)
@@ -450,7 +504,7 @@ function plot_contours(img; save=false, filename=nothing, cmap=:gray)
         if !isdir("images") mkpath("images") end
         full_path = endswith(filename, ".png") ? "images/$filename" : "images/$filename.png"
         Plots.savefig(plt, full_path)
-        println("Contornos guardados en: $full_path")
+        println("Topological contours cached to: $full_path")
     end
 
     display(plt)

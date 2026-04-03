@@ -1,14 +1,30 @@
+"""
+    Schwarzschild
+
+Provides the exact analytical implementation of the Schwarzschild 
+spacetime metric and its associated null geodesic integrations.
+"""
 module Schwarzschild
 
-# IMPORTANTE: Usamos 'import' para poder extender las funciones del padre
+# Enforces generic extension of base Raytracing functions
 import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
 using StaticArrays
 
 export SchwarzschildBH
 
-# Inmutable: los parámetros no cambian tras la construcción.
-# Permite al compilador optimizar el acceso a campos sin boxing.
+# Immutable struct: prevents heap allocation and boxing overhead during execution.
+"""
+    SchwarzschildBH(M::Float64=1.0)
+
+Implements the geometry of a spherically symmetric, non-rotating black hole.
+
+# Fields
+- `a`: Spin parameter (exactly `0.0` for Schwarzschild).
+- `EH`: Radius of the Event Horizon, \$r_+ = 2M\$.
+- `ISCOco`: Radius of the Innermost Stable Circular Orbit for co-rotating particles, \$r_{ISCO} = 6M\$.
+- `ISCOcounter`: Radius of the ISCO for counter-rotating particles, \$r_{ISCO} = 6M\$.
+"""
 struct SchwarzschildBH
     a::Float64
     EH::Float64
@@ -20,10 +36,25 @@ struct SchwarzschildBH
     end
 end
 
+"""
+    Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
+
+Calculates the Keplerian angular velocity in the Schwarzschild spacetime:
+\$\\Omega_K = \\frac{1}{r^{3/2}}\$ (assuming \$M=1\$).
+"""
 @inline function Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
-    return 1.0 / (r * sqrt(r))   # r^1.5 sin exponente flotante
+    return 1.0 / (r * sqrt(r))   # Equivalently r^1.5, evading floating point exponentiation overhead
 end
 
+"""
+    metric(b::SchwarzschildBH, x::AbstractVector)
+
+Evaluates the covariant Schwarzschild metric \$g_{\\mu\\nu}\$ using spherical 
+coordinates \$x^\\mu = (t, r, \\theta, \\phi)\$:
+\$ds^2 = -\\left(1 - \\frac{2M}{r}\\right) dt^2 + \\left(1 - \\frac{2M}{r}\\right)^{-1} dr^2 + r^2 d\\theta^2 + r^2 \\sin^2\\theta d\\phi^2\$
+
+Returns `(g_tt, g_rr, g_thth, g_phph, g_tph)`.
+"""
 @inline function metric(b::SchwarzschildBH, x::AbstractVector)
     r  = x[2]; θ = x[3]
     f  = 1.0 - 2.0/r
@@ -32,6 +63,12 @@ end
     return -f, 1.0/f, r2, r2 * sinθ * sinθ, 0.0
 end
 
+"""
+    inverse_metric(b::SchwarzschildBH, x::AbstractVector)
+
+Evaluates the contravariant Schwarzschild metric \$g^{\\mu\\nu}\$.
+Returns `(gtt, grr, gthth, gphph, gtph)`.
+"""
 @inline function inverse_metric(b::SchwarzschildBH, x::AbstractVector)
     r    = x[2]; θ = x[3]
     f    = 1.0 - 2.0/r
@@ -40,7 +77,17 @@ end
     return -1.0/f, f, 1.0/r2, 1.0/(r2 * sinθ * sinθ), 0.0
 end
 
-# Out-of-place: retorna SVector para cero alocaciones en el heap
+# Returns an SVector to strictly enforce zero memory allocations on the heap.
+"""
+    geodesics(q, b::SchwarzschildBH, λ)
+
+Evaluates the right-hand side of the 8-ODE system for null geodesics.
+
+Derived via the Hamiltonian framework:
+\$\\mathcal{H} = \\frac{1}{2} \\left[ -\\left(1 - \\frac{2M}{r}\\right)^{-1} p_t^2 + \\left(1 - \\frac{2M}{r}\\right) p_r^2 + \\frac{p_\\theta^2}{r^2} + \\frac{p_\\phi^2}{r^2 \\sin^2\\theta} \\right] = 0\$
+
+Returns an `SVector` of \$(\\dot{t}, \\dot{r}, \\dot{\\theta}, \\dot{\\phi}, \\dot{p}_t, \\dot{p}_r, \\dot{p}_\\theta, \\dot{p}_\\phi)\$ to guarantee zero heap allocations.
+"""
 @inline function geodesics(q, b::SchwarzschildBH, λ)
     @inbounds begin
         r    = q[2]

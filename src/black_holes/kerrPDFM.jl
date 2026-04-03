@@ -1,3 +1,8 @@
+"""
+    KerrPFDM
+
+Provides the metric and Hamiltonian for a Kerr black hole immersed in Perfect Fluid Dark Matter (PFDM).
+"""
 module KerrPFDM
 
 export KerrPFDMBH
@@ -12,6 +17,17 @@ using StaticArrays
 # ============================================================
 # Kerr–PFDM Black Hole struct 
 # ============================================================
+"""
+    KerrPFDMBH(a::Float64, k::Float64)
+
+Definition of a Kerr black hole immersed in PFDM.
+
+# Fields
+- `a`: Spin parameter, \$a = J/M\$.
+- `k`: PFDM intensity parameter.
+- `EH`: Radius of the Event horizon, solved numerically where \$\\Delta(r) = 0\$.
+- `ISCOco` / `ISCOcounter`: ISCO radii.
+"""
 mutable struct KerrPFDMBH
     a::Float64
     k::Float64
@@ -21,11 +37,11 @@ mutable struct KerrPFDMBH
 
     function KerrPFDMBH(a::Float64, k::Float64)
 
-        # --- Horizon (Δ = 0) ---
+        # --- Event Horizon Structural constraint (Δ = 0) ---
         fΔ(r) = r^2 + a^2 - 2r*(1 - (k/2)*log(r/abs(k)))
         EH = find_zero(fΔ, 1 + sqrt(1 - a^2))
 
-        # --- ISCOs: not guaranteed to exist in PFDM ---
+        # --- ISCO domains: strict analytical existence not guaranteed under PFDM constraints ---
         ISCOco = nothing
         ISCOcounter = nothing
 
@@ -33,14 +49,32 @@ mutable struct KerrPFDMBH
     end
 end
 # ============================================================
-# Masa efectiva PFDM
+# Effective PFDM dynamical mass profile
 # ============================================================
+"""
+    m_eff(r, k)
+
+Effective mass profile of the black hole with surrounding PFDM:
+\$m_{eff}(r) = 1 - \\frac{k}{2} \\log\\left(\\frac{r}{|k|}\\right)\$.
+"""
 m_eff(r, k) = 1 - (k/2)*log(max(r, 1e-8)/abs(k))
+
+"""
+    dm_dr(r, k)
+
+Radial derivative of the effective mass:
+\$\\frac{dm_{eff}}{dr} = -\\frac{k}{2r}\$.
+"""
 dm_dr(r, k) = -k/(2r)
 
 # ============================
 # Angular velocity Ω
 # ============================
+"""
+    Omega(b::KerrPFDMBH, r::Real; corotating::Bool=true)
+
+Calculates the Keplerian angular velocity for a circular orbit in Kerr-PFDM.
+"""
 function Omega(b::KerrPFDMBH, r::Real; corotating::Bool=true)
     m  = m_eff(r, b.k)
     dm = dm_dr(r, b.k)
@@ -55,6 +89,11 @@ end
 # ============================
 # Kerr–PFDM metric
 # ============================
+"""
+    metric(b::KerrPFDMBH, x::AbstractVector)
+
+Evaluates the Kerr-PFDM covariant metric tensor \$g_{\\mu\\nu}\$.
+"""
 function metric(b::KerrPFDMBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
@@ -80,6 +119,11 @@ end
 # ============================
 # Inverse metric
 # ============================
+"""
+    inverse_metric(b::KerrPFDMBH, x::AbstractVector)
+
+Evaluates the Kerr-PFDM contravariant metric tensor \$g^{\\mu\\nu}\$.
+"""
 function inverse_metric(b::KerrPFDMBH, x::AbstractVector)
     r = x[2]
     θ = x[3]
@@ -106,6 +150,11 @@ end
 # ============================
 # Photon geodesics (Hamiltonian)
 # ============================
+"""
+    geodesics(q, b::KerrPFDMBH, λ)
+
+Evaluates the null geodesics 8-ODE system under the PFDM Hamiltonian constraints.
+"""
 function geodesics(q, b::KerrPFDMBH, λ)
     # q = [t, r, θ, φ, kt, kr, kθ, kφ]
     r  = q[2]
@@ -129,7 +178,7 @@ function geodesics(q, b::KerrPFDMBH, λ)
     Σ2 = Σ^2
     Δ  = r2 - 2*m*r + a2
 
-    # Hamiltonian structure (misma que Kerr)
+    # Hamiltonian structure bounds (identical to Kerr metric framework)
     W = -kt*(r2 + a2) - b.a*kφ
 
     partΞ =
@@ -140,7 +189,7 @@ function geodesics(q, b::KerrPFDMBH, λ)
 
     Ξ = W^2 - Δ*partΞ
 
-    # Derivadas
+    # First-order ODE geometrical derivatives
     dΞdE = 2*W*(r2 + a2) + 2*b.a*Δ*(kφ + b.a*kt*sinθ2)
     dΞdL = -2*b.a*W - 2*b.a*kt*Δ - 2*kφ*Δ/sinθ2
     dΞdr = -4*r*kt*W - 2*(r - m - r*dm)*partΞ - 2*r*Δ
@@ -159,7 +208,7 @@ function geodesics(q, b::KerrPFDMBH, λ)
         (kφ^2*cosθ/(sinθ2*sinθ)))/Σ +
         (Ξ/(Δ*Σ2))*auxθ
 
-    # Ecuaciones de movimiento
+    # Evaluated equations of motion
     dtdλ  = dΞdE/(2*Δ*Σ)
     drdλ  = (Δ/Σ)*kr
     dθdλ  = kθ/Σ
