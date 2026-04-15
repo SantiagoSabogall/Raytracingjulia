@@ -10,7 +10,7 @@ using NPZ
 # ----------------------------
 # Black Hole Configuration
 # ----------------------------
-a = 0.5
+a = 0.998
 blackhole = KerrBH(a)
 
 # ----------------------------
@@ -19,7 +19,7 @@ blackhole = KerrBH(a)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 1000
+x_pixels = 200
 
 detector = Detector(
     D,
@@ -32,7 +32,7 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = ThinDisk.ThinDisk(blackhole)
+acc_structure = ThinDisk(blackhole)
 
 # ----------------------------
 # Image Processing

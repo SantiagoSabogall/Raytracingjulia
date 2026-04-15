@@ -130,12 +130,17 @@ function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, det
     lmbda_range = range(0.0, -final_λ, length=Int(7 * final_λ))
     tspan = (lmbda_range[1], lmbda_range[end])
 
+    horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
+    horizon_affect!(integrator) = terminate!(integrator)
+    cb = ContinuousCallback(horizon_cond, horizon_affect!)
+
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
     sol = solve(prob, Tsit5(), 
                 reltol=1e-8, 
                 abstol=1e-8, 
                 verbose=false,
-                saveat=lmbda_range)
+                saveat=lmbda_range,
+                callback=cb)
 
     p.fP = @SVector zeros(8)
 
@@ -222,12 +227,17 @@ function integrate_for_H(p::Photon, blackhole, acc_structure, detector)
     lmbda_range = range(0.0, -final_lmbda, length = Int(7 * final_lmbda))
     tspan = (lmbda_range[1], lmbda_range[end])
 
+    horizon_cond_H(u, t, integrator) = u[2] - (blackhole.EH + 1e-4)
+    horizon_affect_H!(integrator) = terminate!(integrator)
+    cb_H = ContinuousCallback(horizon_cond_H, horizon_affect_H!)
+
     prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
 
     sol = solve(prob, Tsit5(),
                 reltol = 1e-8,
                 abstol = 1e-8,
-                saveat = lmbda_range)
+                saveat = lmbda_range,
+                callback = cb_H)
 
 
     last_idx = length(sol.u)
@@ -520,23 +530,22 @@ function verify_Hamiltonian(img::Image; n::Int=10)
         ylabel = "H",
         legend = :outerright,
         grid = true,
-        gridalpha = 0.3
+        gridalpha = 0.3,
+        ylims = (-1, 1)
     )
-
 
     indices = rand(1:length(img.photon_list), n)
 
     for i in indices
         p = img.photon_list[i]
-        
 
         lambdas, H_vals = integrate_for_H(p, img.blackhole, img.acc_structure, img.detector)
 
         Plots.plot!(plt, lambdas, H_vals, label = "Photon #$i")
+
+        println("Hamiltonian constraint verified: |H_max - H_0| = ", abs(maximum(H_vals) - H_vals[1]))
     end
 
-
-    
     display(plt)
 end
 end 

@@ -10,7 +10,7 @@ using Raytracingjulia
 # Black Hole Configuration
 # ----------------------------
 a = 0.5
-blackhole = KerrBH(a)
+blackhole = SchwarzschildBH()
 
 # ----------------------------
 # Detector
@@ -31,7 +31,7 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = ThinDisk.ThinDisk(blackhole)
+acc_structure = ThinDisk(blackhole)
 
 # ----------------------------
 # Image Processing

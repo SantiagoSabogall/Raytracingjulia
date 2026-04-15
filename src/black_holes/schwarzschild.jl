@@ -86,36 +86,48 @@ Evaluates the right-hand side of the 8-ODE system for null geodesics.
 Derived via the Hamiltonian framework:
 \$\\mathcal{H} = \\frac{1}{2} \\left[ -\\left(1 - \\frac{2M}{r}\\right)^{-1} p_t^2 + \\left(1 - \\frac{2M}{r}\\right) p_r^2 + \\frac{p_\\theta^2}{r^2} + \\frac{p_\\phi^2}{r^2 \\sin^2\\theta} \\right] = 0\$
 
-Returns an `SVector` of \$(\\dot{t}, \\dot{r}, \\dot{\\theta}, \\dot{\\phi}, \\dot{p}_t, \\dot{p}_r, \\dot{p}_\\theta, \\dot{p}_\\phi)\$ to guarantee zero heap allocations.
+Hamilton's equations:
+- \$\\dot{x}^\\mu = \\partial \\mathcal{H} / \\partial p_\\mu = g^{\\mu\\nu} p_\\nu\$
+- \$\\dot{p}_\\mu = -\\partial \\mathcal{H} / \\partial x^\\mu = -\\frac{1}{2} \\partial_\\mu g^{\\alpha\\beta} p_\\alpha p_\\beta\$
+
+Returns an `SVector{8}` of \$(\\dot{t}, \\dot{r}, \\dot{\\theta}, \\dot{\\phi}, \\dot{p}_t, \\dot{p}_r, \\dot{p}_\\theta, \\dot{p}_\\phi)\$.
 """
 @inline function geodesics(q, b::SchwarzschildBH, λ)
     @inbounds begin
-        r    = q[2]
-        θ    = q[3]
-        k_t  = q[5]
-        k_r  = q[6]
-        k_th = q[7]
-        k_φ  = q[8]
+        r   = q[2]
+        θ   = q[3]
+        p_t = q[5]
+        p_r = q[6]
+        p_θ = q[7]
+        p_φ = q[8]
     end
 
     sinθ, cosθ = sincos(θ)
-    f     = 1.0 - 2.0/r
-    r2    = r * r
     sinθ2 = sinθ * sinθ
-    inv_r2    = 1.0 / r2
-    inv_rm2sq = 1.0 / ((r - 2.0) * (r - 2.0))
 
-    dtdλ = -k_t / f
-    drdλ =  f * k_r
-    dθdλ =  k_th * inv_r2
-    dφdλ =  k_φ  * inv_r2 / sinθ2
+    r2     = r * r
+    f      = 1.0 - 2.0 / r
+    inv_f  = 1.0 / f
+    inv_r2 = 1.0 / r2
+    inv_r3 = inv_r2 / r
 
-    dk_t  = 0.0
-    dk_r  = -inv_r2 * dtdλ^2 + inv_rm2sq * drdλ^2 + r * dθdλ^2 + r * sinθ2 * dφdλ^2
-    dk_th = sinθ * cosθ * dφdλ^2
-    dk_φ  = 0.0
+    # ── ẋ^μ = ∂H/∂p_μ = g^μν p_ν ──
+    dtdλ =  -inv_f * p_t
+    drdλ =   f * p_r
+    dθdλ =   inv_r2 * p_θ
+    dφdλ =   inv_r2 / sinθ2 * p_φ
 
-    return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dk_t, dk_r, dk_th, dk_φ)
+    # ── ṗ_μ = -∂H/∂x^μ = -½ ∂g^αβ/∂x^μ p_α p_β ──
+    # ∂g^tt/∂r =  2/(r²f²),   ∂g^rr/∂r = 2/r²
+    # ∂g^θθ/∂r = -2/r³,       ∂g^φφ/∂r = -2/(r³sin²θ)
+    dp_t = 0.0
+    dp_r = -inv_r2 * (inv_f * inv_f * p_t^2 + p_r^2) +
+            inv_r3 * (p_θ^2 + p_φ^2 / sinθ2)
+    # ∂g^φφ/∂θ = -2cosθ/(r²sin³θ)
+    dp_θ = cosθ / (r2 * sinθ2 * sinθ) * p_φ^2
+    dp_φ = 0.0
+
+    return SVector{8, Float64}(dtdλ, drdλ, dθdλ, dφdλ, dp_t, dp_r, dp_θ, dp_φ)
 end
 
 end # module Schwarzschild

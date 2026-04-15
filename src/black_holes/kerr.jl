@@ -178,7 +178,7 @@ function geodesics(q, b::KerrBH, λ)
     W = -kt * (r2 + a2) - a * kφ
     
     # Optimized Ξ subset evaluations
-    partΞ = r2 + (kφ + a * kt)^2 + a2 * (1.0 + kt^2) * cosθ2 + (kφ^2 * cosθ2 * inv_sinθ2)
+    partΞ = (kφ + a * kt)^2 - a2 * kt^2 * cosθ2 + (kφ^2 * cosθ2 * inv_sinθ2)
     Ξ = W^2 - Δ * partΞ
 
     # First-order invariant derivatives with respect to geometric bounds
@@ -186,7 +186,7 @@ function geodesics(q, b::KerrBH, λ)
     dΞdL = -2.0 * a * W - 2.0 * a * kt * Δ - 2.0 * kφ * Δ * inv_sinθ2
     
     # Analytically simplified radial structural derivative 
-    dΞdr = -4.0 * r * kt * W - 2.0 * (r - 1.0) * partΞ - 2.0 * r * Δ 
+    dΞdr = -4.0 * r * kt * W - 2.0 * (r - 1.0) * partΞ
 
     # Optimized metric derivatives, evaluating multiplications replacing strict analytical divisions 
     common_term = Ξ * invΔ * invΣ
@@ -200,7 +200,7 @@ function geodesics(q, b::KerrBH, λ)
     
     # Modified partial components over θ
     term_trig_C = (kφ^2 * cosθ * inv_sinθ2 * inv_sinθ)
-    dCdθ = ((1.0 + kt^2) * auxθ + term_trig_C) * invΣ + (common_term * auxθ * invΣ)
+    dCdθ = (-kt^2 * auxθ + term_trig_C) * invΣ + (common_term * auxθ * invΣ)
 
     # Differential equations mapped structurally to 8-ODE dimensions
     dtdλ = dΞdE * 0.5 * invΔ * invΣ

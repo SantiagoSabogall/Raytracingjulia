@@ -7,7 +7,7 @@ of pixel coordinates to 4-momentum using Bardeen's impact parameters.
 module ImagePlane
 
 using StaticArrays
-using ..Raytracingjulia: metric
+using ..Raytracingjulia: metric, inverse_metric
 
 
 export Detector, photon_coords
@@ -122,8 +122,11 @@ function photon_coords(d::Detector, blackhole, alpha::Float64, beta::Float64;
     k_t = -freq * sqrt(g_phph / (g_tph^2 - g_tt * g_phph)) +
           alpha * g_tph * invD / sqrt(g_phph)
 
-    term_r = 1.0 - (k_th^2 / g_thth) - (k_ph^2 / g_phph)
-    k_r = sqrt(g_rr * max(0.0, term_r))   # Inbound trajectory geometry constraints
+    # Enforce null geodesic condition: g^{μν} k_μ k_ν = 0
+    # Solve for k_r from: g^rr k_r² = -(g^tt k_t² + g^θθ k_θ² + g^φφ k_φ² + 2 g^tφ k_t k_φ)
+    gtt, grr, gthth, gphph, gtph = inverse_metric(blackhole, x)
+    null_residual = gtt * k_t^2 + gthth * k_th^2 + gphph * k_ph^2 + 2 * gtph * k_t * k_ph
+    k_r = sqrt(max(0.0, -null_residual / grr))
 
     # Returned via direct SVector{8} structural typing bypassing dynamic heap allocations
     return SVector{8, Float64}(0.0, r, theta, phi, k_t, k_r, k_th, k_ph)

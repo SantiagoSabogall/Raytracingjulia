@@ -10,7 +10,7 @@ using NPZ
 # Configuración del agujero negro
 # ----------------------------
 a = 0.5
-k = 0.1 # Parámetro de masa efectiva del PFDM
+k = 0.5 # Parámetro de masa efectiva del PFDM (Float64)
 blackhole = KerrPFDMBH(a, k)
 
 # ----------------------------
