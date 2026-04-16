@@ -72,57 +72,7 @@ end
 # ============================================================
 # Geodesic integrators
 # ============================================================
-"""
-    geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
-
-Integrates the null geodesics via `DifferentialEquations.jl` using a `Tsit5` solver.
-Uses `ContinuousCallback` to accurately detect collisions with the accretion disk or 
-the event horizon.
-
-Returns the observed radiative intensity scaled by the Doppler factor \$g^3\$.
-"""
-function geodesics_integrate(p::Photon, blackhole, acc_structure, detector)
-
-    r_max = 1.2 * detector.D
-    tspan = (0.0, -1.5 * detector.D)
-
-    hit_intensity = Ref(0.0)   # 🔥 FIX
-
-    disc_cond(u, t, integrator) = cos(u[3])
-    
-    function disc_affect!(integrator)
-        r = integrator.u[2]
-        if acc_structure.in_edge < r < acc_structure.out_edge
-            I0 = acc_structure.intensity(r)
-            hit_intensity[] = doppler_shift(integrator.u, I0, blackhole)  # 🔥 FIX
-            terminate!(integrator)
-        end
-    end
-
-    horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
-    horizon_affect!(integrator) = terminate!(integrator)
-
-    escape_cond(u, t, integrator) = u[2] - r_max
-    escape_affect!(integrator) = terminate!(integrator)
-
-    cb = CallbackSet(
-        ContinuousCallback(disc_cond, disc_affect!),
-        ContinuousCallback(horizon_cond, horizon_affect!),
-        ContinuousCallback(escape_cond, escape_affect!)
-    )
-
-    prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-
-    sol = solve(prob, Tsit5(); 
-        callback=cb, 
-        reltol=1e-6, 
-        abstol=1e-6, 
-        save_everystep=false,
-        verbose=false
-    )
-
-    return hit_intensity[]   # 🔥 FIX
-end
+# Redundant dynamic solver geodesics_integrate removed. Logic moved to create_image! and pre-allocated thread pools.
 
 function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, detector)
 
@@ -143,6 +93,7 @@ function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, det
                 callback=cb)
 
     p.fP = @SVector zeros(8)
+
 
     for i in 1:(length(sol.u) - 1)
         z_curr = cos(sol.u[i][3])
@@ -343,14 +294,66 @@ function create_image!(img::Image)
     img.image_data = zeros(img.detector.x_pixels, img.detector.y_pixels)
     n_photons = length(img.photon_list)
     
-    println("Integrating trajectories with ", nthreads(), " threads...")
+    blackhole = img.blackhole
+    acc_structure = img.acc_structure
+    detector = img.detector
+    
+    r_max = 1.2 * detector.D
+    tspan = (0.0, -1.5 * detector.D)
+
+    disc_cond(u, t, integrator) = cos(u[3])
+    
+    function disc_affect!(integrator)
+        r = integrator.u[2]
+        if acc_structure.in_edge < r < acc_structure.out_edge
+            terminate!(integrator)
+        end
+    end
+
+    horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
+    horizon_affect!(integrator) = terminate!(integrator)
+
+    escape_cond(u, t, integrator) = u[2] - r_max
+    escape_affect!(integrator) = terminate!(integrator)
+
+    cb = CallbackSet(
+        ContinuousCallback(disc_cond, disc_affect!),
+        ContinuousCallback(horizon_cond, horizon_affect!),
+        ContinuousCallback(escape_cond, escape_affect!)
+    )
+
+    # Base Problem for Initialization
+    dummy_u0 = @SVector zeros(8)
+    prob = ODEProblem(geodesics, dummy_u0, tspan, blackhole)
+
+    # Resolve threadid() > nthreads() bounds errors
+    n_t = try eval(:(Threads.maxthreadid())) catch; Threads.nthreads() end
+    n_t = max(n_t, Threads.nthreads(), 32)
+
+    # Pre-allocate fully initialized Tsit5 thread pool integrators
+    integrators = [init(prob, Tsit5(); callback=cb, reltol=1e-6, abstol=1e-6, save_everystep=false, verbose=false) for _ in 1:n_t]
+    
+    println("Integrating trajectories with ", nthreads(), " threads (pool of $n_t integrators)...")
     t0 = time()
 
     counter = Atomic{Int}(0)
     
     @threads for k in 1:n_photons
         p = img.photon_list[k]
-        intensity = geodesics_integrate(p, img.blackhole, img.acc_structure, img.detector)
+        tid = threadid()
+        
+        integrator = integrators[tid]
+        reinit!(integrator, p.iC)
+        solve!(integrator)
+        
+        # Post-solve physical assignment avoids closures
+        r_final = integrator.u[2]
+        intensity = 0.0
+        if acc_structure.in_edge < r_final < acc_structure.out_edge
+            I0 = acc_structure.intensity(r_final)
+            intensity = doppler_shift(integrator.u, I0, blackhole)
+        end
+        
         img.image_data[p.i, p.j] = intensity
         
         c = atomic_add!(counter, 1) + 1
