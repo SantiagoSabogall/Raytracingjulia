@@ -65,6 +65,7 @@ include("black_holes/schwarzschild.jl")
 include("black_holes/kerr.jl")
 include("black_holes/num_schwarzschild.jl") 
 include("black_holes/kerrPDFM.jl")
+include("black_holes/kerrscalaron.jl")
 
 include("detectors/image_plane.jl")
 include("accretion_structures/thin_disk.jl")
@@ -77,13 +78,14 @@ include("common/common.jl")
 using .Schwarzschild: SchwarzschildBH
 using .Kerr: KerrBH
 using .KerrPFDM: KerrPFDMBH
+using .KerrScalaron: KerrScalaronBH
 using .SchwarzschildNumerical: SchwarzschildNumBH, dr_inverse_metric
 using .ImagePlane: Detector
 using .ThinDiskmod: ThinDisk
 using .SimpleDiskmod: SimpleDisk
 using .Common: Image, create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift, plot
 
-export SchwarzschildBH, KerrBH, KerrPFDMBH, SchwarzschildNumBH, dr_inverse_metric
+export SchwarzschildBH, KerrBH, KerrPFDMBH, KerrScalaronBH, SchwarzschildNumBH, dr_inverse_metric
 export Detector, ThinDisk, SimpleDisk, Image
 export create_photons!, create_image!,create_image_no_Doppler!,create_shadow!, plot_shadow, plot_contours, verify_Hamiltonian, doppler_shift, plot
 

@@ -10,8 +10,8 @@ using NPZ
 # Configuración del agujero negro
 # ----------------------------
 a = 0.5
-k = 0.5 # Parámetro de masa efectiva del PFDM (Float64)
-blackhole = KerrPFDMBH(a, k)
+Mpsi = 0.5 # Parámetro M de scalaron (Float64)
+blackhole = KerrScalaronBH(a, Mpsi)
 
 # ----------------------------
 # Detector
@@ -52,7 +52,7 @@ create_photons!(image)
 
 create_image!(image)
 
-filename = "Kerr_a_0.5_1920"
+filename = "KerrScalaron_a_0.5_1920"
 
 println("Mostrando imagen de prueba...")
 plot(image, save=true, filename=filename)
