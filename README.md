@@ -45,3 +45,19 @@ src/
 ## Reproducibility and Data Availability 
 
 This code emphasizes transparent research. All implementations natively integrate comprehensive Julia docstrings including mathematical definitions in LaTeX for rapid in-terminal verification (`?KerrBH`, `?geodesics`, etc.). The code handles deterministic photon ray bundles via `DifferentialEquations.jl` employing adaptive TSit5 ODE solvers.
+
+## Acknowledgements
+
+`Raytracingjulia` is a rigorous Julia adaptation and extension inspired by the Python codebase `andromeda`, originally developed by Eduard Larrañaga. We sincerely acknowledge his foundational work on the geometric and numerical formulation of null geodesics mapping.
+
+If you use or reference this codebase, please ensure appropriate attribution to the original author:
+
+```bibtex
+@software{larranaga2025andromeda,
+  author = {Larrañaga, Eduard},
+  title = {andromeda:},
+  url = {https://github.com/ashcat2005/andromeda},
+  version = {main branch},
+  year = {2025}
+}
+```
