@@ -11,7 +11,7 @@ using NPZ
 # ----------------------------
 a = 0.5
 Mpsi = 0.5 # Parámetro M de scalaron (Float64)
-k = 0.4
+k = 0.5
 blackhole = KerrPFDMBH(a, k)
 
 
@@ -21,7 +21,7 @@ blackhole = KerrPFDMBH(a, k)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 1920
+x_pixels = 400
 
 detector = Detector(
     D,
@@ -54,7 +54,7 @@ create_photons!(image)
 
 create_image!(image)
 
-filename = "KerrPDFM_K04"
+filename = "KerrPDFM_K05"
 
 println("Mostrando imagen de prueba...")
 plot(image, save=true, filename=filename)

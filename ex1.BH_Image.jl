@@ -21,7 +21,7 @@ blackhole = KerrPFDMBH(a, k)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 400
+x_pixels = 1920
 
 detector = Detector(
     D,
@@ -54,7 +54,7 @@ create_photons!(image)
 
 create_image!(image)
 
-filename = "KerrPDFM_K05"
+filename = "KerrPDFM_K055"
 
 println("Mostrando imagen de prueba...")
 plot(image, save=true, filename=filename)
