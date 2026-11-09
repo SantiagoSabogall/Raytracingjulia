@@ -64,7 +64,7 @@ export metric, inverse_metric, geodesics, Omega
 include("black_holes/schwarzschild.jl")
 include("black_holes/kerr.jl")
 include("black_holes/num_schwarzschild.jl") 
-include("black_holes/kerrPDFM.jl")
+include("black_holes/kerrPFDM.jl")
 include("black_holes/kerrscalaron.jl")
 
 include("detectors/image_plane.jl")

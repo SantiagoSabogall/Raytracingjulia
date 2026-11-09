@@ -33,7 +33,7 @@ src/
 │   └── thin_disk.jl            # Novikov-Thorne Page-Thorne flux models
 ├── black_holes/                # Curvature constraints
 │   ├── kerr.jl                 # Spin metrics
-│   ├── kerrPDFM.jl             # PFDM extensions
+│   ├── kerrPFDM.jl             # PFDM extensions
 │   ├── num_schwarzschild.jl    # Numerical splines models
 │   └── schwarzschild.jl        # Standard M=1 spherical metrics
 ├── detectors/
