@@ -19,8 +19,7 @@ blackhole = KerrBH(a)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 90
-
+x_pixels = 200
 detector = Detector(
     D,
     iota,
@@ -32,7 +31,7 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = ThinDisk.ThinDisk(blackhole)
+acc_structure = ThinDisk(blackhole)
 
 # ----------------------------
 # Image Processing
@@ -46,6 +45,6 @@ println("Trazando rayos...")
 
 create_shadow!(image)
 
-filename = "Kerr_a_0.5_90_shadow_test.png"
+filename = "Kerr_a_0.5_90_shadow_test"
 
 plot_shadow(image, save=true, filename=filename)

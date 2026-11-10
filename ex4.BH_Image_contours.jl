@@ -7,13 +7,11 @@ using Raytracingjulia
 using LinearAlgebra
 using NPZ
 
-# Configuración del agujero negro
+# ----------------------------
+# Black Hole Configuration
 # ----------------------------
 a = 0.5
-Mpsi = 0.5 # Parámetro M de scalaron (Float64)
-k = 0.5
-blackhole = KerrPFDMBH(a, k)
-
+blackhole = KerrBH(a)
 
 # ----------------------------
 # Detector
@@ -21,7 +19,7 @@ blackhole = KerrPFDMBH(a, k)
 D = 100.0
 iota = 85 * pi / 180
 x_side = 25.0
-x_pixels = 400
+x_pixels = 90
 
 detector = Detector(
     D,
@@ -34,17 +32,10 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-#  Estructura de acrecion para KerrPFDM
-acc_structure = SimpleDisk(
-    blackhole;
-    R_min = 3.0
-)
+acc_structure = ThinDisk(blackhole)
 
-# acc_structure = ThinDisk(
-#     blackhole
-# )
 # ----------------------------
-# Imagen
+# Image Processing
 # ----------------------------
 image = Image(blackhole, acc_structure, detector)
 
@@ -54,7 +45,7 @@ create_photons!(image)
 
 create_image!(image)
 
-filename = "KerrPDFM_K05"
+filename = "Kerr_a_0.5_900_thin_disk_test"
 
-println("Mostrando imagen de prueba...")
-plot(image, save=true, filename=filename)
+println("Rendering test image...")
+plot_contours(image, save=true, filename=filename)

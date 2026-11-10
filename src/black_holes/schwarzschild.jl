@@ -26,13 +26,15 @@ Implements the geometry of a spherically symmetric, non-rotating black hole.
 - `ISCOcounter`: Radius of the ISCO for counter-rotating particles, \$r_{ISCO} = 6M\$.
 """
 struct SchwarzschildBH
+    M::Float64
     a::Float64
     EH::Float64
     ISCOco::Float64
     ISCOcounter::Float64
 
     function SchwarzschildBH(M::Float64=1.0)
-        new(0.0, 2.0*M, 6.0*M, 6.0*M)
+        M > 0 || throw(ArgumentError("M must be positive"))
+        new(M, 0.0, 2.0*M, 6.0*M, 6.0*M)
     end
 end
 
@@ -40,10 +42,10 @@ end
     Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
 
 Calculates the Keplerian angular velocity in the Schwarzschild spacetime:
-\$\\Omega_K = \\frac{1}{r^{3/2}}\$ (assuming \$M=1\$).
+\$\\Omega_K = \\pm\\sqrt{M/r^3}\$; the sign follows `corotating`.
 """
 @inline function Omega(b::SchwarzschildBH, r::Real; corotating::Bool=true)
-    return 1.0 / (r * sqrt(r))   # Equivalently r^1.5, evading floating point exponentiation overhead
+    return (corotating ? 1.0 : -1.0) * sqrt(b.M / (r*r*r))
 end
 
 """
@@ -57,7 +59,7 @@ Returns `(g_tt, g_rr, g_thth, g_phph, g_tph)`.
 """
 @inline function metric(b::SchwarzschildBH, x::AbstractVector)
     r  = x[2]; θ = x[3]
-    f  = 1.0 - 2.0/r
+    f  = 1.0 - 2.0*b.M/r
     sinθ = sin(θ)
     r2   = r * r
     return -f, 1.0/f, r2, r2 * sinθ * sinθ, 0.0
@@ -71,7 +73,7 @@ Returns `(gtt, grr, gthth, gphph, gtph)`.
 """
 @inline function inverse_metric(b::SchwarzschildBH, x::AbstractVector)
     r    = x[2]; θ = x[3]
-    f    = 1.0 - 2.0/r
+    f    = 1.0 - 2.0*b.M/r
     sinθ = sin(θ)
     r2   = r * r
     return -1.0/f, f, 1.0/r2, 1.0/(r2 * sinθ * sinθ), 0.0
@@ -106,7 +108,7 @@ Returns an `SVector{8}` of \$(\\dot{t}, \\dot{r}, \\dot{\\theta}, \\dot{\\phi}, 
     sinθ2 = sinθ * sinθ
 
     r2     = r * r
-    f      = 1.0 - 2.0 / r
+    f      = 1.0 - 2.0*b.M / r
     inv_f  = 1.0 / f
     inv_r2 = 1.0 / r2
     inv_r3 = inv_r2 / r
@@ -121,7 +123,7 @@ Returns an `SVector{8}` of \$(\\dot{t}, \\dot{r}, \\dot{\\theta}, \\dot{\\phi}, 
     # ∂g^tt/∂r =  2/(r²f²),   ∂g^rr/∂r = 2/r²
     # ∂g^θθ/∂r = -2/r³,       ∂g^φφ/∂r = -2/(r³sin²θ)
     dp_t = 0.0
-    dp_r = -inv_r2 * (inv_f * inv_f * p_t^2 + p_r^2) +
+    dp_r = -b.M * inv_r2 * (inv_f * inv_f * p_t^2 + p_r^2) +
             inv_r3 * (p_θ^2 + p_φ^2 / sinθ2)
     # ∂g^φφ/∂θ = -2cosθ/(r²sin³θ)
     dp_θ = cosθ / (r2 * sinθ2 * sinθ) * p_φ^2

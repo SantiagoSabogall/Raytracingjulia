@@ -1,73 +1,69 @@
-using Interpolations: interpolate, Gridded, Linear
+using Plots
+using LinearAlgebra
 
-mutable struct Structure
-    in_edge::Float64
-    out_edge::Float64
-    a::Float64
-    ISCO::Float64
-    energy::Any
-end
+# 1. Definición del perfil de masa PFDM y sus derivadas
+# m(r) = M - (k/2) * log(r/|k|)
+m(r, k)  = 1.0 - (k / 2.0) * log(r / abs(k))
+dm(r, k) = -k / (2.0 * r)
 
-function Structure(blackhole; corotating::Bool=true, R_min::Union{Nothing, Float64}=nothing, R_max::Float64=20.0)
-
-    out_edge_value = float(R_max)
-    a = float(blackhole.a)
-
-    if corotating
-        ISCO = blackhole.ISCOco
-        in_edge_value = blackhole.ISCOco
-    else
-        ISCO = blackhole.ISCOcounter
-        in_edge_value = blackhole.ISCOcounter
-    end
-
-    if R_min !== nothing
-        in_edge_value = float(R_min)
-    end
-
-    s = Structure(in_edge_value, out_edge_value, a, ISCO, nothing)
-
-    rr = collect(range(s.in_edge, stop=s.out_edge, length=100000))
-    ff = f.(Ref(s), rr)
-    ff .-= minimum(ff)
-
-    energy = interpolate((rr,), ff, Gridded(Linear()))
-    s.energy = energy
-    return s
-end
-
-function f(s::Structure, r::Real)
-    a_M = s.a
-    arcos_aM = acos(a_M)
-
-    x0 = sqrt(s.ISCO)
-    x1 = 2 * cos((arcos_aM - pi) / 3)
-    x2 = 2 * cos((arcos_aM + pi) / 3)
-    x3 = -2 * cos(arcos_aM / 3)
-    x = sqrt(r)
-
-    c = 3 / (2 * (x^4) * (x^3 - 3*x + 2 *a_M))
+# 2. Función simplificada para encontrar el ISCO (basada en tu código)
+function find_isco_value(a, k)
+    # Horizonte de eventos aproximado (para empezar la búsqueda)
+    # En Kerr-PFDM el horizonte cambia con k, aquí usamos una estimación
+    r_start = 1.0 + sqrt(max(0.0, 1.0 - a^2)) + 0.1 
     
-    t1 = x - x0 - (3*s.a/2) * log(x / x0)
-    t2 = -((3 * (x1 - a_M)^2) / (x1 * (x1 - x2) * (x1 - x3))) * log((x - x1)/(x0 - x1))
-    t3 = -((3 * (x2 - a_M)^2) / (x2 * (x2 - x1) * (x2 - x3))) * log((x - x2)/(x0 - x2))
-    t4 = -((3 * (x3 - a_M)^2) / (x3 * (x3 - x1) * (x3 - x2))) * log((x - x3)/(x0 - x3))
-
-    return c * (t1 + t2 + t3 + t4)
-
-end
-
-function intensity(s::Structure, r::Real)
-    if r > s.in_edge && r < s.out_edge
-        return s.energy(r)
-    else
-        return 0.0
+    # Función de energía para órbita circular ecuatorial
+    function energy_circular(r)
+        mr = m(r, k)
+        dmr = dm(r, k)
+        Σ = r^2
+        
+        # Derivadas de la métrica (θ = π/2)
+        dgtt = 2*(dmr*r + mr)/Σ - 4*mr*r^2/Σ^2
+        dgtphi = -2a*(dmr*r + mr)/Σ + 4a*mr*r^2/Σ^2
+        dgphiphi = 2r + 2a^2*(dmr*r + mr)/Σ - 4a^2*mr*r^2/Σ^2
+        
+        # Velocidad angular Ω (prograda)
+        disc = dgtphi^2 - dgtt*dgphiphi
+        disc < 0 && return NaN
+        Ω = (-dgtphi + sqrt(disc)) / dgphiphi
+        
+        # Componentes de la métrica
+        gtt = -(1.0 - 2mr*r/Σ)
+        gtphi = -2a*mr*r/Σ
+        gphi = (r^2 + a^2 + 2*a^2*mr*r/Σ)
+        
+        # Energía E
+        denom = -(gtt + 2gtphi*Ω + gphi*Ω^2)
+        denom <= 0 && return NaN
+        ut = 1.0 / sqrt(denom)
+        return -(gtt + gtphi*Ω) * ut
     end
+
+    # Búsqueda del mínimo de E (ISCO)
+    rs = range(r_start, 100.0, length=2000)
+    E_prev = Inf
+    for r in rs
+        E = energy_circular(r)
+        if isnan(E) continue end
+        if E > E_prev return r end # El mínimo ocurre justo antes de que suba
+        E_prev = E
+    end
+    return NaN
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    println()
-    println("THIS IS A MODULE DEFINING ONLY A PART OF THE COMPLETE CODE.")
-    println("YOU NEED TO RUN THE main.jl FILE TO GENERATE THE IMAGE")
-    println()
+# 3. Generación de la gráfica
+ks = range(0.001, 1.2, length=100)
+as = [0.3, 0.5, 0.7, 0.8]
+colores = [:blue, :orange, :green, :red]
+
+plt = plot(title="The influence of k on the ISCO", xlabel="k", ylabel="ISCO", 
+           xlim=(0, 1.4), ylim=(0, 26), legend=:topright)
+
+for (i, a_val) in enumerate(as)
+    isco_vals = [find_isco_value(a_val, k_val) for k_val in ks]
+    # Filtramos NaNs para una línea limpia
+    plot!(plt, ks, isco_vals, label="a=$a_val", color=colores[i], lw=2)
 end
+
+display(plt)

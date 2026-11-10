@@ -32,6 +32,7 @@ Structure representing a Novikov-Thorne accretion disk.
 mutable struct ThinDisk
     in_edge::Float64
     out_edge::Float64
+    corotating::Bool
     a::Float64
     ISCO::Float64
     energy_profile::Function
@@ -48,7 +49,7 @@ function ThinDisk(
     R_max::Float64 = 20.0
 )
     out_edge = float(R_max)
-    a = float(blackhole.a)
+    a = corotating ? float(blackhole.a) : -float(blackhole.a)
 
     ISCO = if hasproperty(blackhole, :ISCOco)
         corotating ? blackhole.ISCOco : blackhole.ISCOcounter
@@ -58,7 +59,7 @@ function ThinDisk(
 
     in_edge = R_min === nothing ? ISCO : float(R_min)
 
-    disk = ThinDisk(in_edge, out_edge, a, ISCO, r -> 0.0, r -> 0.0)
+    disk = ThinDisk(in_edge, out_edge, corotating, a, ISCO, r -> 0.0, r -> 0.0)
 
     # ============================
     # Precompute Novikov–Thorne profile

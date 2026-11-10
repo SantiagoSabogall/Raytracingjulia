@@ -221,5 +221,45 @@ end
     # A photon state far out on the equatorial plane with no angular momentum.
     u = @SVector [0.0, 80.0, pi/2, 0.0, -1.0, 0.1, 0.0, 0.0]
     I0 = 1.0
-    @test doppler_shift(u, I0, sch) ≈ I0 rtol=1e-2
+    @test doppler_shift(u, I0, sch) ≈ I0 * (1 - 3/80)^(3/2) rtol=1e-6
+end
+
+@testset "Mass and disk rotation conventions" begin
+    bh = SchwarzschildBH(2.0)
+    x = @SVector [0.0, 8.0, pi/2, 0.0]
+    @test bh.EH == 4.0
+    @test metric(bh, x)[1] ≈ -0.5
+    @test inverse_metric(bh, x)[1] ≈ -2.0
+    @test Omega(bh, 8.0) ≈ sqrt(2 / 8^3)
+    @test Omega(bh, 8.0; corotating=false) ≈ -sqrt(2 / 8^3)
+    @test SimpleDisk(bh; corotating=false).corotating == false
+
+    u = @SVector [0.0, 8.0, pi/2, 0.0, -1.0, 0.0, 0.0, 2.0]
+    @test doppler_shift(u, 1.0, bh; corotating=true) !=
+          doppler_shift(u, 1.0, bh; corotating=false)
+end
+
+@testset "Numerical lapse orbital frequency" begin
+    mktempdir() do dir
+        rs = collect(range(2.1, 30.0, length=100))
+        fN = joinpath(dir, "N.txt")
+        fdN = joinpath(dir, "dN.txt")
+        writedlm(fN, hcat(rs, 1 .- 2 ./ rs))
+        writedlm(fdN, hcat(rs, 2 ./ rs.^2))
+        bh = SchwarzschildNumBH(fN, fdN; EH=2.0, ISCOco=6.0)
+        @test Omega(bh, 8.0) ≈ 8.0^(-3/2) rtol=1e-4
+        @test Omega(bh, 8.0; corotating=false) ≈ -Omega(bh, 8.0)
+    end
+end
+
+@testset "Escaping rays do not emit from the disk" begin
+    bh = SchwarzschildBH()
+    det = Detector(100.0, pi/2, 2.0; x_pixels=4, ratio="1:1")
+    disk = SimpleDisk(bh; R_min=110.0, R_max=130.0)
+    img = Image(bh, disk, det)
+    create_photons!(img)
+    create_image!(img)
+    @test all(iszero, img.image_data)
+    create_image_no_Doppler!(img)
+    @test all(iszero, img.image_data)
 end

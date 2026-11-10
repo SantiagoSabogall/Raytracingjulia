@@ -17,10 +17,11 @@ import ..Raytracingjulia: metric, inverse_metric, geodesics, Omega
 
 
 """
-    SchwarzschildNumBH(path_N::String, path_dN::String)
+    SchwarzschildNumBH(path_N::String, path_dN::String; EH=2.0, ISCOco=6.0, ISCOcounter=ISCOco)
 
 A dynamically loadable numerical Schwarzschild black hole. 
 Constructs cubic splines from text files corresponding to \$N(r)\$ and \$\\frac{dN}{dr}\$.
+Supply horizon and ISCO radii for non-Schwarzschild numerical metrics.
 """
 mutable struct SchwarzschildNumBH
     rN::Vector{Float64}
@@ -36,7 +37,8 @@ mutable struct SchwarzschildNumBH
     ISCOco::Float64
     ISCOcounter::Float64
 
-    function SchwarzschildNumBH(path_N::String, path_dN::String)
+    function SchwarzschildNumBH(path_N::String, path_dN::String;
+                                EH::Real=2.0, ISCOco::Real=6.0, ISCOcounter::Real=ISCOco)
         dataN = readdlm(path_N)
         datadN = readdlm(path_dN)
 
@@ -48,8 +50,8 @@ mutable struct SchwarzschildNumBH
         N = Spline1D(rN, Nvals)
         dNdr = Spline1D(rdN, dNvals)
 
-        # Default Event Horizon and ISCO values for Schwarzschild (configurable depending on numerical constraints)
-        new(rN, Nvals, N, rdN, dNvals, dNdr, 0.0, 2.0, 6.0, 6.0)
+        new(rN, Nvals, N, rdN, dNvals, dNdr, 0.0,
+            Float64(EH), Float64(ISCOco), Float64(ISCOcounter))
     end
 end
 
@@ -57,10 +59,10 @@ end
     Omega(b::SchwarzschildNumBH, r::Real; corotating::Bool=true)
 
 Calculates the Keplerian angular velocity for a numerically defined metric:
-\$\\Omega_K = \\frac{1}{r^{3/2}}\$ (assuming mass \$M=1\$ is implicit in the numerical tables).
+\$\\Omega_K = \\pm\\sqrt{N'(r)/(2r)}\$; the sign follows `corotating`.
 """
 function Omega(b::SchwarzschildNumBH, r::Real; corotating::Bool=true)
-    return 1 / r^(3/2)
+    return (corotating ? 1.0 : -1.0) * sqrt(b.dNdr(r) / (2r))
 end
 
 

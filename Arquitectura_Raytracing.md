@@ -16,12 +16,14 @@ graph TD;
     Core --> Acc[Accretion Structures];
     Core --> Com[Common Integrator];
     
-    BH -->|Schwarzschild.jl| Core;
-    BH -->|Kerr.jl| Core;
-    BH -->|KerrPDFM.jl| Core;
+    BH -->|schwarzschild.jl| Core;
+    BH -->|kerr.jl| Core;
+    BH -->|kerrPFDM.jl| Core;
+    BH -->|kerrscalaron.jl| Core;
+    BH -->|num_schwarzschild.jl| Core;
     
-    Det -->|Image_plane.jl| Com;
-    Acc -->|Thin_disk.jl| Com;
+    Det -->|image_plane.jl| Com;
+    Acc -->|thin_disk.jl / simple_disk.jl| Com;
     
     Com -->|DifferentialEquations.jl| Final[Renderizado Final de la Imagen];
 ```
@@ -33,7 +35,7 @@ graph TD;
 La simulación funciona **"hacia atrás"** (Backwards Ray-Tracing). En lugar de emitir luz desde el agujero negro y esperar que caiga en la cámara del observador (lo cual es ineficiente), se *lanzan* fotones desde la cámara y se calcula matemáticamente de dónde provienen en el disco de acreción.
 
 ### Paso 1: Configuración del Escenario Físico
-El usuario inicializa en su script (`ex1.jl`) tres elementos fundamentales:
+El usuario inicializa en su script (`ex1.BH_Image.jl`) tres elementos fundamentales:
 1. **Un Agujero Negro (Spacetime)**: Entidades como `KerrBH` o `SchwarzschildBH` que contienen la estructura geométrica ($M, a, r_{EH}, r_{ISCO}$).
 2. **Un Disco de Acreción (Acc_structure)**: Entidades como `ThinDisk` que proporcionan un perfil radial de cómo el gas caliente emite luz. En el disco delgado se usa el perfil termodinámico de Novikov-Thorne.
 3. **Una Pantalla Sensora (Detector)**: Situada a una distancia $D$ con un ángulo de inclinación $\iota$. Se define un mosaico de píxeles espaciales $(\alpha, \beta)$.
@@ -59,7 +61,7 @@ Por cada píxel en la cámara, debemos crear un "Rayo Luminoso" (objeto `Photon`
 ---
 
 ### Paso 3: Integración Geodésica Hacia Atrás en el Tiempo
-Ubicación: `src/common/common.jl` -> `geodesics_integrate()`
+Ubicación: `src/common/common.jl` -> `create_image!()`
 
 Con los fotones creados, se inicia un bucle de paralelismo agresivo (`@threads` en Julia). Se le exige a `DifferentialEquations.jl` que propague temporalmente el cuadrivector del fotón usando el **Hamiltoniano Geodésico**.
 
@@ -71,7 +73,7 @@ El integrador `Tsit5` (Runge-Kutta de orden 5 modificado) empuja al fotón itera
 
 ---
 
-### Paso 4: Detección de Colisión Discreta (Callbacks)
+### Paso 4: Detección continua de intersecciones (Callbacks)
 A medida que el fotón es integrado paso a paso hacia el abismo, Julia supervisa simultáneamente ciertas condiciones (`ContinuousCallback`):
 1. **Condición de Disco (`disc_cond`)**: Revisa constantemente si el fotón cruza el plano ecuatorial del agujero negro ($\theta = \frac{\pi}{2}$). Esto se evalúa vigilando si $\cos\theta = 0$.
    - **Afectación**: Si lo cruza, y está entre los bordes numéricos $r_{in} < r < r_{out}$, el integrador **Pausa / Termina** la ecuación. Ha impactado luz.

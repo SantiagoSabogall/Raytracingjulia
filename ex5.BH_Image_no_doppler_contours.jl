@@ -32,7 +32,7 @@ detector = Detector(
 # ----------------------------
 # Estructura de acreción
 # ----------------------------
-acc_structure = ThinDisk.ThinDisk(blackhole)
+acc_structure = ThinDisk(blackhole)
 
 # ----------------------------
 # Image Processing
@@ -45,7 +45,7 @@ create_photons!(image)
 
 create_image_no_Doppler!(image)
 
-filename = "Kerr_a_0.5_900_thin_disk_test.png"
+filename = "Kerr_a_0.5_900_thin_disk_no_doppler_contours"
 
 println("Rendering test image...")
 plot_contours(image, save=true, filename=filename)

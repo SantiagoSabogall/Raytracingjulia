@@ -20,6 +20,7 @@ Structure representing a generic localized geometrically flat accretion disk.
 mutable struct SimpleDisk
     in_edge::Float64
     out_edge::Float64
+    corotating::Bool
     intensity::Function
 end
 
@@ -54,7 +55,7 @@ function SimpleDisk(blackhole;
     intensity_func = r ->
         default_intensity(r, float(in_edge_value), float(R_max))
 
-    return SimpleDisk(float(in_edge_value), float(R_max), intensity_func)
+    return SimpleDisk(float(in_edge_value), float(R_max), corotating, intensity_func)
 end
 
 end # module

@@ -79,41 +79,25 @@ end
 # Redundant dynamic solver geodesics_integrate removed. Logic moved to create_image! and pre-allocated thread pools.
 
 function geodesics_integrate_no_Doppler(p::Photon, blackhole, acc_structure, detector)
-
     final_λ = 1.5 * detector.D
-    lmbda_range = range(0.0, -final_λ, length=Int(7 * final_λ))
-    tspan = (lmbda_range[1], lmbda_range[end])
-
-    horizon_cond(u, t, integrator) = u[2] - (blackhole.EH + 1e-5)
-    horizon_affect!(integrator) = terminate!(integrator)
-    cb = ContinuousCallback(horizon_cond, horizon_affect!)
-
-    prob = ODEProblem(geodesics, p.iC, tspan, blackhole)
-    sol = solve(prob, Tsit5(), 
-                reltol=1e-8, 
-                abstol=1e-8, 
-                verbose=false,
-                saveat=lmbda_range,
-                callback=cb)
-
-    p.fP = @SVector zeros(8)
-
-
-    for i in 1:(length(sol.u) - 1)
-        z_curr = cos(sol.u[i][3])
-        z_next = cos(sol.u[i+1][3])
-        
-        if z_curr * z_next < 0
-            u = sol.u[i]
-            r = u[2]
-            if acc_structure.in_edge < r < acc_structure.out_edge
-                p.fP = u
-                return acc_structure.intensity(r)
-            end
+    hit_disk = Ref(false)
+    function disc_affect!(integrator)
+        r = integrator.u[2]
+        if acc_structure.in_edge < r < acc_structure.out_edge
+            hit_disk[] = true
+            terminate!(integrator)
         end
     end
-
-    return 0.0
+    cb = CallbackSet(
+        ContinuousCallback((u, t, i) -> cos(u[3]), disc_affect!),
+        ContinuousCallback((u, t, i) -> u[2] - (blackhole.EH + 1e-5), terminate!),
+        ContinuousCallback((u, t, i) -> u[2] - 1.2*detector.D, terminate!)
+    )
+    sol = solve(ODEProblem(geodesics, p.iC, (0.0, -final_λ), blackhole), Tsit5();
+                reltol=1e-8, abstol=1e-8, verbose=false,
+                save_everystep=false, callback=cb)
+    p.fP = hit_disk[] ? sol.u[end] : @SVector zeros(8)
+    return hit_disk[] ? acc_structure.intensity(p.fP[2]) : 0.0
 end
 
 function shadow_integ(p::Photon, blackhole, detector)
@@ -161,18 +145,21 @@ Assuming the rest frame of the emitting particle rotates with Keplerian angular 
 
 Returns the invariant Doppler-shifted intensity \$I_{obs} = I_0 g^3\$.
 """
-function doppler_shift(u_final, I0::Float64, blackhole)
+function doppler_shift(u_final, I0::Float64, blackhole; corotating::Bool=true)
     coords = @SVector [u_final[1], u_final[2], u_final[3], u_final[4]]
     g_tt, _, _, g_phph, g_tph = metric(blackhole, coords)
 
-    Ω = Omega(blackhole, u_final[2])
+    Ω = Omega(blackhole, u_final[2]; corotating=corotating)
     !isfinite(Ω) && return 0.0
 
     k_t   = u_final[5]
     k_phi = u_final[8]
 
     # Doppler invariant redshift ratio assignment
-    g = sqrt(abs(-g_tt - 2g_tph*Ω - g_phph*Ω^2)) / (1 + k_phi*Ω / k_t)
+    norm2 = -g_tt - 2g_tph*Ω - g_phph*Ω^2
+    norm2 > 0 || return 0.0
+    g = sqrt(norm2) / (1 + k_phi*Ω / k_t)
+    isfinite(g) && g > 0 || return 0.0
 
     return I0 * g^3
 end
@@ -304,12 +291,14 @@ function create_image!(img::Image)
     
     r_max = 1.2 * detector.D
     tspan = (0.0, -1.5 * detector.D)
+    hit_disk = falses(max(Threads.maxthreadid(), Threads.nthreads(), 32))
 
     disc_cond(u, t, integrator) = cos(u[3])
     
     function disc_affect!(integrator)
         r = integrator.u[2]
         if acc_structure.in_edge < r < acc_structure.out_edge
+            hit_disk[threadid()] = true
             terminate!(integrator)
         end
     end
@@ -347,15 +336,17 @@ function create_image!(img::Image)
         tid = threadid()
         
         integrator = integrators[tid]
+        hit_disk[tid] = false
         reinit!(integrator, p.iC)
         solve!(integrator)
         
         # Post-solve physical assignment avoids closures
         r_final = integrator.u[2]
         intensity = 0.0
-        if acc_structure.in_edge < r_final < acc_structure.out_edge
+        if hit_disk[tid]
             I0 = acc_structure.intensity(r_final)
-            intensity = doppler_shift(integrator.u, I0, blackhole)
+            intensity = doppler_shift(integrator.u, I0, blackhole;
+                                      corotating=acc_structure.corotating)
         end
         
         img.image_data[p.i, p.j] = intensity
@@ -458,7 +449,7 @@ function plot(img::Image; save=false, filename=nothing, cmap=:afmhot)
     return plt
 end
 
-function plot_shadow(img; save=false, filename=nothing, cmap=:gray)
+function plot_shadow(img; save=false, filename=nothing, cmap=:grays)
 
     data = copy(img.image_data)
     
@@ -471,7 +462,7 @@ function plot_shadow(img; save=false, filename=nothing, cmap=:gray)
     plt = heatmap(
         data',
         aspect_ratio = :equal,
-        c = cmap,
+        c = cgrad(cmap),
         clims = (0, 1), 
         axis = true,       
         framestyle = :box,

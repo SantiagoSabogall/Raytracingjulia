@@ -48,6 +48,8 @@ desktop.ini
 ############################
 
 # Resultados y figuras
+docs/build/
+docs/Manifest.toml
 output/
 results/
 figures/
